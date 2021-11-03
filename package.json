@@ -1,5 +1,5 @@
 {
-  "name": "Darin-Game",
+  "name": "Suly-Tech",
   "version": "1.0.0",
   "description": "",
   "main": "app.js",
@@ -8,12 +8,12 @@
   },
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/Azhi99/Darin-Game.git"
+    "url": "git+https://github.com/Azhi99/sulytech-system.git"
   },
   "author": "suly tech",
   "license": "ISC",
   "bugs": {
-    "url": "https://github.com/Azhi99/Darin-Game/issues"
+    "url": "https://github.com/Azhi99/sulytech-system/issues"
   },
   "dependencies": {
     "bcrypt": "^5.0.1",
