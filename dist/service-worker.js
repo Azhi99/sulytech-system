@@ -17,7 +17,7 @@ importScripts(
   "/precache-manifest.ccbdb4eeb29796b55dbe78da49304f3a.js"
 );
 
-workbox.core.setCacheNameDetails({prefix: "darin-game"});
+workbox.core.setCacheNameDetails({prefix: "suly-tech"});
 
 self.addEventListener('message', (event) => {
   if (event.data && event.data.type === 'SKIP_WAITING') {
