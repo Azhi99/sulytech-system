@@ -181,7 +181,13 @@ router.get('/getItemByCode/:itemCode', async (req, res) => {
     res.status(200).send(item || null);
 });
 
-router.get('/getItem/:search', (req, res) => {
+router.get('/getItemInfo', (req, res) => {
+    db.raw(`SELECT * FROM tbl_items WHERE LOWER(itemCode) = '${req.query.search.toLowerCase()}' OR LOWER(itemName) = '${req.query.search.toLowerCase()}'`).then(([[data]]) => {
+        res.status(200).send(data);
+    });
+});
+
+router.get('/getItem', (req, res) => {
     db.raw(`select 
         itemID,
         itemCode,
@@ -191,7 +197,7 @@ router.get('/getItem/:search', (req, res) => {
         itemPriceWhole,
         perUnit
         from tbl_items 
-            where LOWER(itemCode) like "${req.params.search.toLowerCase()}%" or LOWER(itemName) like "${req.params.search.toLowerCase()}%"
+            where LOWER(itemCode) like "${req.query.search.toLowerCase()}%" or LOWER(itemName) like "${req.query.search.toLowerCase()}%"
     `).then(([data]) => {
         res.status(200).send(data)
     }) 
