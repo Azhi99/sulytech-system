@@ -25,7 +25,7 @@ router.post('/addPurchase', async (req, res) => {
             accountID: req.body.supplierID,
             accountType: 's',
             accountName: req.body.supplierName,
-            totalPrice: req.body.totalPrice,
+            totalPrice: req.body.stockType == 'p' ? req.body.totalPrice : req.body.totalPrice * -1,
             totalPay: req.body.amountPay,
             transactionType: req.body.paymentType,
             userID: (jwt.verify(req.headers.authorization.split(' ')[1], process.env.KEY)).userID
@@ -51,9 +51,9 @@ router.post('/addPurchase', async (req, res) => {
                 sourceID: purchaseID,
                 sourceType: req.body.stockType,
                 itemID: item.itemID,
-                qty: item.qty,
+                qty: req.body.stockType == 'p' ? item.qty : item.qty * -1,
                 itemPrice: 0,
-                costPrice: item.costPrice  // What if stock type is return purchase
+                costPrice: item.costPrice 
             });
         }
         res.status(200).send({
@@ -65,7 +65,169 @@ router.post('/addPurchase', async (req, res) => {
 });
 
 router.post('/addItem', async (req, res) => {
+    try {
+        const [pIitemID] = await db('tbl_purchase_items').insert({
+            purchaseID: req.body.purchaseID,
+            itemID: req.body.itemID,
+            costPrice: req.body.costPrice,
+            qty: req.body.qty
+        });
+    
+        await db('tbl_stock').insert({
+            sourceID: req.body.purchaseID,
+            sourceType: req.body.stockType,
+            itemID: req.body.itemID,
+            qty: req.body.qty,
+            itemPrice: 0,
+            costPrice: req.body.costPrice
+        });
 
+        await db('tbl_purchases').where('purchaseID', req.body.purchaseID).update({
+            totalPrice: req.body.totalPrice,
+            userIDUpdate: (jwt.verify(req.headers.authorization.split(' ')[1], process.env.KEY)).userID
+        });
+
+        await db('tbl_transactions').where('sourceID', req.body.purchaseID).andWhere('sourceType', req.body.stockType).update({
+            totalPrice: req.body.totalPrice,
+            totalPay: req.body.amountPay
+        });
+
+        res.status(200).send({
+            pIitemID,
+            itemID: req.body.itemID
+        });
+
+    } catch (error) {
+        console.log(error);
+        res.status(500).send(error);
+    }
+
+});
+
+router.patch('/updatePurchase', async (req, res) => {
+    try {
+        await db('tbl_purchases').where('purchaseID', req.body.purchaseID).update({
+            referenceNo: req.body.referenceNo,
+            supplierID: req.body.supplierID,
+            amountPay: req.body.amountPay,
+            PurchaseStatus: req.body.PurchaseStatus,
+            note: req.body.note
+        });
+        await db('tbl_transactions').where('sourceID', req.body.purchaseID).andWhere('sourceType', req.body.stockType).update({
+            totalPrice: req.body.totalPrice,
+            totalPay: req.body.amountPay
+        });
+        await db('tbl_box_transaction').where('sourceID', req.body.purchaseID).andWhere('type', req.body.stockType).update({
+            amount: req.body.amountPay
+        });
+        res.sendStatus(200);
+    } catch (error) {
+        console.log(error);
+        res.status(500).send(error);
+    }
+});
+
+router.patch('/updateCostPrice', async (req, res) => {
+    try {
+        await db('tbl_purchase_items').where('pItemID', req.body.pItemID).update({
+            costPrice: req.body.costPrice
+        });
+
+        await db('tbl_stock').where('sourceID', req.body.purchaseID).andWhere('sourceType', req.body.stockType).andWhere('itemID', req.body.itemID).update({
+            costPrice: req.body.costPrice
+        });
+        
+        await db('tbl_purchases').where('purchaseID', req.body.purchaseID).update({
+            totalPrice: req.body.totalPrice,
+            userIDUpdate: (jwt.verify(req.headers.authorization.split(' ')[1], process.env.KEY)).userID
+        });
+
+        await db('tbl_transactions').where('sourceID', req.body.purchaseID).andWhere('sourceType', req.body.stockType).update({
+            totalPrice: req.body.stockType == 'p' ? req.body.totalPrice : req.body.totalPrice * -1
+        });
+
+    } catch (error) {
+        res.status(200).send(error);
+    }
+});
+
+router.patch('/updateQty', async (req, res) => {
+    try {
+        await db('tbl_purchase_items').where('pItemID', req.body.pItemID).update({
+            qty: req.body.qty
+        });
+
+        await db('tbl_stock').where('sourceID', req.body.purchaseID).andWhere('sourceType', req.body.stockType).andWhere('itemID', req.body.itemID).update({
+            qty: req.body.qty
+        });
+        
+        await db('tbl_purchases').where('purchaseID', req.body.purchaseID).update({
+            totalPrice: req.body.totalPrice,
+            userIDUpdate: (jwt.verify(req.headers.authorization.split(' ')[1], process.env.KEY)).userID
+        });
+
+        await db('tbl_transactions').where('sourceID', req.body.purchaseID).andWhere('sourceType', req.body.stockType).update({
+            totalPrice: req.body.stockType == 'p' ? req.body.totalPrice : req.body.totalPrice * -1
+        });
+
+    } catch (error) {
+        res.status(200).send(error);
+    }
+});
+
+router.delete('/deleteItem/:pItemID/:purchaseID/:itemID/:sourceType/:totalPrice', async (req, res) => {
+    try {
+        await db('tbl_stock').where('sourceID', req.params.purchaseID).andWhere('sourceType', req.params.sourceType).andWhere('itemID', req.params.itemID).delete();
+        await db('tbl_transactions').where('sourceID', req.params.purchaseID).andWhere('sourceType', req.params.sourceType).update({
+            totalPrice: req.params.sourceType == 'p' ? req.params.totalPrice : req.params.totalPrice * -1
+        });
+        await db('tbl_purchases').where('purchaseID', req.params.purchaseID).update({
+            totalPrice: req.params.totalPrice
+        });
+        res.sendStatus(200);
+    } catch (error) {
+        res.status(200).send(error);
+    }
+});
+
+router.get('/getPurchases/:from/:to', async (req, res) => {
+    const [purchases] = await db.raw(`SELECT
+        tbl_purchases.purchaseID as purchaseID,
+        tbl_purchases.supplierID as supplierID,
+        tbl_suppliers.supplierName as supplierName,
+        tbl_purchases.referenceNo as referenceNo,
+        tbl_purchases.dollarPrice as dollarPrice,
+        tbl_purchases.totalPrice as totalPrice,
+        tbl_purchases.amountPay as amountPay,
+        tbl_purchases.PurchaseStatus as PurchaseStatus,
+        tbl_purchases.paymentType as paymentType,
+        tbl_purchases.stockType as stockType,
+        tbl_purchases.note as note,
+        tbl_purchases.createAt as createAt,
+        tbl_users.fullName as user
+            FROM tbl_purchases
+                JOIN tbl_suppliers ON (tbl_purchases.supplierID = tbl_suppliers.supplierID)
+                JOIN tbl_users ON (tbl_purchases.userIDCreated = tbl_users.userID)
+            WHERE DATE(tbl_purchases.createAt) BETWEEN '${new Date(req.params.from).toISOString().split('T')[0]}' AND '${new Date(req.params.to).toISOString().split('T')[0]}'
+    `);
+
+    res.status(200).send(purchases);
+});
+
+router.get('/getPurchaseItems/:purchaseID', async (req, res) => {
+    const [items] = await db.raw(`SELECT
+        tbl_purchase_items.pItemID as pItemID,
+        tbl_purchase_items.itemID as itemID,
+        tbl_items.itemCode as itemCode,
+        tbl_items.itemName as itemName,
+        tbl_purchase_items.costPrice as costPrice,
+        tbl_purchase_items.qty as qty
+            FROM tbl_purchase_items
+                JOIN tbl_items ON (tbl_purchase_items.itemID  = tbl_items.itemID)
+            WHERE tbl_purchase_items.purchaseID = ?
+    `, [req.params.purchaseID]);
+
+    res.status(200).send(items);
 });
 
 module.exports = router;
