@@ -78,37 +78,20 @@ router.post('/addExpense', async(req,res) => {
             userIDUpdated: (jwt.verify(req.headers.authorization.split(' ')[1], process.env.KEY)).userID
         })
 
-        if(req.body.priceExpenseIQD > 0 && req.body.priceExpense$ > 0) {
-            const priceIQD = req.body.priceExpenseIQD / req.body.dollarPrice
-            await db('tbl_box_transaction').insert({
-                shelfID: req.body.shelfID,
-                sourceID: expenseID,
-                amount: -1 * (req.body.priceExpense$ + priceIQD),
-                type: 'exp',
-                note: req.body.note ? req.body.note : 'خەرجی',
-                userID: (jwt.verify(req.headers.authorization.split(' ')[1], process.env.KEY)).userID,
-            })
-        } else if(req.body.priceExpenseIQD <= 0 && req.body.priceExpense$ > 0) {
-            await db('tbl_box_transaction').insert({
-                shelfID: req.body.shelfID,
-                sourceID: expenseID,
-                amount: -1 * req.body.priceExpense$,
-                type: 'exp',
-                note: req.body.note ? req.body.note : 'خەرجی',
-                userID: (jwt.verify(req.headers.authorization.split(' ')[1], process.env.KEY)).userID,
-            })
-        } else {
-            const priceIQD = req.body.priceExpenseIQD / req.body.dollarPrice
+        // add to tbl_box_transactions
 
+            // const priceIQD = req.body.priceExpenseIQD / req.body.dollarPrice  //ama bo awa bw ka expense dinarish bkat ba dollar ballam esta chwnka IQD haya la qsa pewist bawa naka dabnre
             await db('tbl_box_transaction').insert({
                 shelfID: req.body.shelfID,
                 sourceID: expenseID,
-                amount: -1 * priceIQD,
+                amount: -1 * (req.body.priceExpense$),
+                amountIQD: -1 * (req.body.priceExpenseIQD),
                 type: 'exp',
                 note: req.body.note ? req.body.note : 'خەرجی',
                 userID: (jwt.verify(req.headers.authorization.split(' ')[1], process.env.KEY)).userID,
             })
-        }
+        
+       
         
         res.status(201).send({
         expenseID
@@ -132,30 +115,17 @@ router.patch('/updateExpense/:expenseID', async(req,res) => {
             userIDUpdated: (jwt.verify(req.headers.authorization.split(' ')[1], process.env.KEY)).userID
         })
 
-        if(req.body.priceExpenseIQD > 0 && req.body.priceExpense$ > 0) {
-            const priceIQD = req.body.priceExpenseIQD / req.body.dollarPrice
+        // update to tbl_box_transactions
+        
+            // const priceIQD = req.body.priceExpenseIQD / req.body.dollarPrice
             await db('tbl_box_transaction').where('sourceID', req.params.expenseID).andWhere('type', 'exp').update({
                 shelfID: req.body.shelfID,
-                amount: -1 * (req.body.priceExpense$ + priceIQD),
+                amount: -1 * (req.body.priceExpense$),
+                amountIQD: -1 * (req.body.priceExpenseIQD),
                 note: req.body.note,
                 userID: (jwt.verify(req.headers.authorization.split(' ')[1], process.env.KEY)).userID,
             })
-        } else if(req.body.priceExpenseIQD <= 0 && req.body.priceExpense$ > 0) {
-            await db('tbl_box_transaction').where('sourceID', req.params.expenseID).andWhere('type', 'exp').update({
-                shelfID: req.body.shelfID,
-                amount: -1 * req.body.priceExpense$,
-                note: req.body.note,
-                userID: (jwt.verify(req.headers.authorization.split(' ')[1], process.env.KEY)).userID,
-            })
-        } else {
-            const priceIQD = req.body.priceExpenseIQD / req.body.dollarPrice
-            await db('tbl_box_transaction').where('sourceID', req.params.expenseID).andWhere('type', 'exp').update({
-                shelfID: req.body.shelfID,
-                amount: -1 * priceIQD,
-                note: req.body.note,
-                userID: (jwt.verify(req.headers.authorization.split(' ')[1], process.env.KEY)).userID,
-            })
-        }
+        
          res.sendStatus(200)
     } catch (error) {
         res.status(500).send(error)

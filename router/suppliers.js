@@ -97,10 +97,12 @@ router.get('/allSuppliers', async(req,res) => {
 // refernce NO is optional
 router.post('/addReturnDebt', async(req,res) => {
     try {
+        const dinar = req.body.amountReturnIQD / req.body.dollarPrice
         const [rdID] = await db('tbl_return_debt').insert({
             supplierID: req.body.supplierID,
             // shelfID: req.body.shelfID,
-            amountReturn: req.body.amountReturn || 0,
+            amountReturn: ((req.body.amountReturn + dinar) - req.body.discount) || 0,
+            amountReturnIQD: req.body.amountReturnIQD || 0,
             referenceNO: req.body.referenceNO,
             discount: req.body.discount,
             dollarPrice: req.body.dollarPrice,
@@ -108,14 +110,15 @@ router.post('/addReturnDebt', async(req,res) => {
             userID: (jwt.verify(req.headers.authorization.split(' ')[1], process.env.KEY)).userID
         })
 
-        // await db('tbl_box_transaction').insert({
-        //     shelfID: req.body.shelfID,
-        //     sourceID: rdID,
-        //     amount: req.body.amountReturn * -1,
-        //     type: 'rdp',
-        //     note: req.body.note + ' ' + req.body.supplierName ,
-        //     userID: (jwt.verify(req.headers.authorization.split(' ')[1], process.env.KEY)).userID
-        // })
+        await db('tbl_box_transaction').insert({
+            shelfID: req.body.shelfID,
+            sourceID: rdID,
+            amount: req.body.amountReturn * -1,
+            amountIQD: req.body.amountReturnIQD * -1,
+            type: 'rdp',
+            note: req.body.note + ' ' + req.body.supplierName ,
+            userID: (jwt.verify(req.headers.authorization.split(' ')[1], process.env.KEY)).userID
+        })
         
         if(req.body.purchaseNumbers.length) {
             await db('tbl_purchases').whereIn('purchaseID', req.body.purchaseNumbers).update({
@@ -131,7 +134,7 @@ router.post('/addReturnDebt', async(req,res) => {
             accountID: req.body.supplierID,
             accountType: 's',
             accountName: req.body.supplierName,
-            totalPrice: (-1) * (req.body.amountReturn - req.body.discount),
+            totalPrice: (-1) * ((req.body.amountReturn + dinar) - req.body.discount),
             transactionType: 'rd',
             userID: (jwt.verify(req.headers.authorization.split(' ')[1], process.env.KEY)).userID
         })
@@ -150,15 +153,17 @@ router.patch('/updateReturnDebt/:rdID', async(req,res) => {
         await db('tbl_return_debt').where('rdID', req.params.rdID).update({
             // shelfID: req.body.shelfID,
             amountReturn: req.body.amountReturn || 0,
+            amountReturnIQD: req.body.amountReturnIQD || 0,
             referenceNO: req.body.referenceNO || null,
             discount: req.body.discount,
             dollarPrice: req.body.dollarPrice,
         })
 
-        // await db('tbl_box_transaction').where('sourceID', req.params.rdID).andWhere('type', 'rdp').update({
-        //     amount: req.body.amountReturn * -1,
-        //     userID: (jwt.verify(req.headers.authorization.split(' ')[1], process.env.KEY)).userID
-        // })
+        await db('tbl_box_transaction').where('sourceID', req.params.rdID).andWhere('type', 'rdp').update({
+            amount: req.body.amountReturn * -1,
+            amountIQD: req.body.amountReturnIQD * -1,
+            userID: (jwt.verify(req.headers.authorization.split(' ')[1], process.env.KEY)).userID
+        })
 
         if(req.body.purchaseNumbers.length) {
             const [{oldPurchases}] = await db('tbl_return_debt').where('rdID', req.params.rdID).select(['purchaseNumbers as oldPurchases']);
@@ -174,9 +179,10 @@ router.patch('/updateReturnDebt/:rdID', async(req,res) => {
             });
         }
 
+        const dinar = req.body.amountReturnIQD / req.body.dollarPrice
         await db('tbl_transactions').where('sourceID', rdID).andWhere('sourceType', 'rdp').andWhere('accountID', req.body.supplierID)
         .insert({
-            totalPrice: (-1) * (req.body.amountReturn - req.body.discount),
+            totalPrice: (-1) * ((req.body.amountReturn + dinar) - req.body.discount),
             userID: (jwt.verify(req.headers.authorization.split(' ')[1], process.env.KEY)).userID
         })
 
@@ -206,6 +212,7 @@ router.get('/todayReturnDebt', async (req, res) => {
         tbl_suppliers.supplierID,
         tbl_suppliers.supplierName,
         tbl_return_debt.amountReturn,
+        tbl_return_debt.amountReturnIQD,
         tbl_return_debt.referenceNO,
         tbl_return_debt.discount,
         tbl_return_debt.dollarPrice,
@@ -273,6 +280,7 @@ router.get('/accountStatement/:from/:to/:accountType', async(req,res) => {
         tbl_transactions.accountType,
         tbl_transactions.totalPrice,
         tbl_transactions.totalPay,
+        tbl_transactions.totalPayIQD,
         tbl_transactions.transactionType,
         tbl_transactions.createAt
       FROM tbl_transactions
@@ -298,6 +306,7 @@ router.get('/accountStatementPartner/:from/:to', async(req,res) => {
         tbl_transactions.accountType,
         tbl_transactions.totalPrice,
         tbl_transactions.totalPay,
+        tbl_transactions.totalPayIQD,
         tbl_transactions.transactionType,
         tbl_transactions.createAt
         FROM tbl_suppliers

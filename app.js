@@ -38,7 +38,7 @@ app.use('/purchase', checkAuth, purchaseRouter)
 app.use('/invoice', checkAuth, invoiceRouter)
 app.use('/generalReport', checkAuth, generalReport)
 app.use('/owner', checkAuth, ownerRouter)
-app.use('/box', checkAuth, boxRouter)
+app.use('/box', boxRouter)
 
 app.post('/login', async (req, res) => {
     const [user] = await db('tbl_users').where('userName', req.body.userName).select();
@@ -115,7 +115,9 @@ app.post('/verifyToken', (req, res) => {
 app.get('*', (req, res) => {
     res.sendFile(path.join(__dirname, 'dist/index.html'));
 });
-
+const rtlArabic = require("rtl-arabic");
+const convertedText = rtlArabic("");
+console.log(convertedText); // احبكم
 app.listen(process.env.PORT, () => {
     console.log(`Server started on port ${process.env.PORT}`);
 })

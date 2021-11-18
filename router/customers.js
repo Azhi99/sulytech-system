@@ -125,10 +125,12 @@ router.get('/countActives', async (req, res) => {
 
 router.post('/addReturnDebt', async(req,res) => {
     try {
+        const dinar = req.body.amountReturnIQD / req.body.dollarPrice
         const [rdcID] = await db('tbl_return_debt_customer').insert({
             customerID: req.body.customerID,
             shelfID: req.body.shelfID,
-            amountReturn: req.body.amountReturn || 0,
+            amountReturn: ((req.body.amountReturn + dinar) - req.body.discount) || 0,
+            amountReturnIQD:  req.body.amountReturnIQD || 0,
             discount: req.body.discount || 0,
             dollarPrice: req.body.dollarPrice || 0,
             invoiceNumbers: req.body.invoiceNumbers.join(',') || null,
@@ -139,6 +141,7 @@ router.post('/addReturnDebt', async(req,res) => {
             shelfID: req.body.shelfID,
             sourceID: rdcID,
             amount: req.body.amountReturn,
+            amountIQD: req.body.amountReturnIQD,
             type: 'rds',
             note:  req.body.note + ' ' + req.body.customerName ,
             userID: (jwt.verify(req.headers.authorization.split(' ')[1], process.env.KEY)).userID
@@ -152,6 +155,7 @@ router.post('/addReturnDebt', async(req,res) => {
         //     });
         // }
 
+
         if(req.body.customerID != 1) {
             await db('tbl_transactions').insert({
                 sourceID: rdcID,
@@ -159,7 +163,7 @@ router.post('/addReturnDebt', async(req,res) => {
                 accountID: req.body.customerID,
                 accountType: 'c',
                 accountName: req.body.customerName,
-                totalPrice: req.body.amountReturn - req.body.discount,
+                totalPrice: ((req.body.amountReturn + dinar) - req.body.discount),
                 transactionType: 'rd',
                 userID: (jwt.verify(req.headers.authorization.split(' ')[1], process.env.KEY)).userID
             })
@@ -177,19 +181,22 @@ router.patch('/updateReturnDebt/:rdcID', async(req,res) => {
     try {
         await db('tbl_return_debt_customer').where('rdcID', req.params.rdcID).update({
             amountReturn: req.body.amountReturn || 0,
+            amountReturnIQD: req.body.amountReturnIQD || 0,
             discount: req.body.discount || 0,
             userID: (jwt.verify(req.headers.authorization.split(' ')[1], process.env.KEY)).userID
         })
 
         await db('tbl_box_transaction').where('sourceID', req.params.rdcID).andWhere('type', 'rds').update({
             amount: req.body.amountReturn,
+            amountIQD: req.body.amountReturnIQD,
             userID: (jwt.verify(req.headers.authorization.split(' ')[1], process.env.KEY)).userID
         })
 
         if(req.body.customerID != 1) {
+            const dinar = req.body.amountReturnIQD / req.body.dollarPrice
             await db('tbl_transactions').where('sourceID', req.params.rdcID).andWhere('sourceType', 'rds').andWhere('accountID', req.body.customerID)
             .update({
-                totalPrice: req.body.amountReturn - req.body.discount,
+                totalPrice: ((req.body.amountReturn + dinar) - req.body.discount),
                 userID: (jwt.verify(req.headers.authorization.split(' ')[1], process.env.KEY)).userID
             })
         }
@@ -248,6 +255,7 @@ router.get('/todayReturnDebt', async(req,res) => {
         tbl_shelfs.shelfID,
         tbl_shelfs.shelfName,
         tbl_return_debt_customer.amountReturn,
+        tbl_return_debt_customer.amountReturnIQD,
         tbl_return_debt_customer.discount,
         tbl_return_debt_customer.dollarPrice,
         tbl_return_debt_customer.invoiceNumbers,
@@ -274,6 +282,7 @@ router.get('/oneDateReturnDebt/:from', async(req,res) => {
         tbl_return_debt_customer.rdcID,
         tbl_customers.customerName,
         tbl_return_debt_customer.amountReturn,
+        tbl_return_debt_customer.amountReturnIQD,
         tbl_return_debt_customer.discount,
         tbl_return_debt_customer.dollarPrice,
         tbl_return_debt_customer.createAt,
@@ -297,6 +306,7 @@ router.get('/betweenDateReturnDebt/:from/:to', async(req,res) => {
         tbl_return_debt_customer.rdcID,
         tbl_customers.customerName,
         tbl_return_debt_customer.amountReturn,
+        tbl_return_debt_customer.amountReturnIQD,
         tbl_return_debt_customer.discount,
         tbl_return_debt_customer.dollarPrice,
         tbl_return_debt_customer.createAt,

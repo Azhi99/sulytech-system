@@ -36,7 +36,7 @@ router.post('/addItem', async(req,res) => {
                     categoryID: req.body.categoryID || null,
                     brandID: req.body.brandID || null,
                     shelfID: req.body.shelfID || null,
-                    unitID: req.body.unitID,
+                    unitID: req.body.unitID || null,
                     perUnit: (req.body.perUnit < 1 ? 1 : req.body.perUnit),
                     costPrice: req.body.costPrice,
                     itemPriceRetail: req.body.itemPriceRetail,
@@ -485,11 +485,11 @@ router.get('/inStockDeatil/:itemID', async(req,res) => {
     }
 })
 
-router.get('/moveFromToInStock', async(req,res) => {
+router.get('/moveFromToInStock/:fromDate/:toDate', async(req,res) => {
     try {
-        const [[{inToStock}]] = await db.raw(`SELECT IFNULL(SUM(tbl_stock.qty),0) AS inToStock FROM tbl_stock WHERE sourceType IN ('p','rs')`)
-        const [[{outFromStock}]] = await db.raw(`SELECT IFNULL(SUM(tbl_stock.qty),0) * -1 AS outFromStock FROM tbl_stock WHERE sourceType IN ('s','rp') `)
-        const [[{disposal}]] = await db.raw(`SELECT IFNULL(SUM(tbl_stock.qty),0) * -1 AS disposal FROM tbl_stock WHERE sourceType IN ('d') `)
+        const [[{inToStock}]] = await db.raw(`SELECT IFNULL(SUM(tbl_stock.qty),0) AS inToStock FROM tbl_stock WHERE sourceType IN ('p','rs') and (Date(createAt) between "${req.params.fromDate}" and "${req.params.toDate}" )`)
+        const [[{outFromStock}]] = await db.raw(`SELECT IFNULL(SUM(tbl_stock.qty),0) * -1 AS outFromStock FROM tbl_stock WHERE sourceType IN ('s','rp') and (Date(createAt) between "${req.params.fromDate}" and "${req.params.toDate}" )`)
+        const [[{disposal}]] = await db.raw(`SELECT IFNULL(SUM(tbl_stock.qty),0) * -1 AS disposal FROM tbl_stock WHERE sourceType IN ('d') and (Date(createAt) between "${req.params.fromDate}" and "${req.params.toDate}" )`)
         const [topSale] = await db.raw(`SELECT
                 tbl_items.itemName,
                 SUM(tbl_stock.qty) * -1 AS topSale
@@ -503,15 +503,15 @@ router.get('/moveFromToInStock', async(req,res) => {
                 ORDER BY 2 DESC
             LIMIT 5`)
         const [notSale] = await db.raw(`SELECT
-                                    tbl_items.itemID,
-                                    tbl_items.itemName,
-                                    IFNULL(SUM(CASE WHEN tbl_stock.sourceType = 's' THEN tbl_stock.qty END), 0)*-1 AS notSale
-                                FROM tbl_stock
-                                    RIGHT OUTER JOIN tbl_items
-                                    ON tbl_stock.itemID = tbl_items.itemID
-                                GROUP BY tbl_items.itemID
-                                HAVING IFNULL(SUM(CASE WHEN tbl_stock.sourceType = 's' THEN tbl_stock.qty END), 0) * (-1) BETWEEN 0 AND 10
-                                    ORDER BY 3 ASC`)
+                tbl_items.itemID,
+                tbl_items.itemName,
+                IFNULL(SUM(CASE WHEN tbl_stock.sourceType = 's' THEN tbl_stock.qty END), 0)*-1 AS notSale
+            FROM tbl_stock
+                RIGHT OUTER JOIN tbl_items
+                ON tbl_stock.itemID = tbl_items.itemID
+            GROUP BY tbl_items.itemID
+            HAVING IFNULL(SUM(CASE WHEN tbl_stock.sourceType = 's' THEN tbl_stock.qty END), 0) * (-1) BETWEEN 0 AND 10
+                ORDER BY 3 ASC`)
         res.status(200).send({
             inToStock,
             outFromStock,
@@ -599,6 +599,7 @@ router.get('/getProfitByItem/:from/:to', async(req,res) => {
 router.get('/getSoldedItems/:from/:to', async (req, res) => {
     const [items] = await db.raw(`
         SELECT 
+            tbl_items.itemCode as itemCode, 
             tbl_items.itemName as itemName, 
             tbl_items.shelfID as shelfID, 
             tbl_invoice_item.qty as qty, 

@@ -130,6 +130,7 @@ router.patch('/updateInvoice/:invoiceID', async(req,res)=> {
         await db('tbl_invoices').where('invoiceID', req.params.invoiceID).update({
             totalPrice: req.body.totalPrice || 0,
             totalPay: req.body.totalPay || 0,
+            totalPayIQD: req.body.totalPayIQD || 0,
             discount: req.body.discount || 0,
             userIDUpdate: (jwt.verify(req.headers.authorization.split(' ')[1], process.env.KEY)).userID
         })
@@ -137,10 +138,25 @@ router.patch('/updateInvoice/:invoiceID', async(req,res)=> {
             await db('tbl_transactions').where('sourceID', req.params.invoiceID).andWhere('sourceType', 's').andWhere('accountID', req.body.customerID)
             .update({
                 totalPrice: req.body.stockType == 's' ? req.body.totalPrice * (-1) : req.body.totalPrice,
-                totalPay: req.body.totalPay,
+                totalPayIQD: req.body.totalPayIQD,
+                totalPay: req.body.totalPay <= 0 && req.body.totalPayIQD > 0 ? req.body.totalPayIQD / req.body.dollarPrice : req.body.totalPay,
                 userID: (jwt.verify(req.headers.authorization.split(' ')[1], process.env.KEY)).userID
             })  
         }
+
+        //to tbl_box_transactions
+        if(req.body.stockType == 's') {
+            await db('tbl_box_transaction').where('sourceID', req.params.invoiceID).andWhere('type', 's').update({
+                amount: req.body.totalPay,
+                amountIQD: req.body.totalPayIQD,
+            })
+        } else {
+            await db('tbl_box_transaction').where('sourceID', req.params.invoiceID).andWhere('type', 's').update({
+                amount: -1 * req.body.totalPay,
+                amountIQD: -1 * req.body.totalPayIQD,
+            })
+        }
+
         res.sendStatus(200)
     } catch (error) {
         res.status(500).send(error)
@@ -277,7 +293,7 @@ router.patch('/updateTotal/:invoiceID/:stockType', async (req, res) => {
         });
         await db('tbl_transactions').where('sourceID', req.params.invoiceID).andWhere('sourceType', req.params.stockType).update({
             totalPrice: req.params.stockType == 's' ? (req.body.totalPrice * (-1)) : req.body.totalPrice,
-            totalPay: req.body.totalPay
+            // totalPay: req.body.totalPay
         });
     } catch (error) {
         res.status(500).send(error);
@@ -313,7 +329,7 @@ router.patch('/sellInvoice/:invoiceID', async(req,res) => {
         await db('tbl_invoices').where('invoiceID', req.params.invoiceID).update({
             customerID: req.body.customerID || 1,
             totalPrice: req.body.totalPrice || 0,
-            totalPay: req.body.totalPay || 0, 
+            totalPay: req.body.totalPay <= 0 && req.body.totalPayIQD > 0 ? req.body.totalPayIQD / req.body.dollarPrice : req.body.totalPay || 0, 
             discount: req.body.discount || 0,
             stockType: req.body.stockType || 's',
             sellStatus: '1',
@@ -366,12 +382,29 @@ router.patch('/sellInvoice/:invoiceID', async(req,res) => {
              .groupBy('shelfID')
         }
         await db('tbl_stock').insert(items);
-        
-        
-        if(req.body.invoiceType == 'c') {
-            await db('tbl_box_transaction').insert(itemToBox)
+         
+        if(req.body.stockType == 's') {
+            await db('tbl_box_transaction').insert({
+                shelfID: 1,
+                sourceID: req.params.invoiceID,
+                amount: req.body.totalPay,
+                amountIQD: req.body.totalPayIQD,
+                type: req.body.stockType,
+                userID: (jwt.verify(req.headers.authorization.split(' ')[1], process.env.KEY)).userID,
+                note: req.body.note2 + ' ' + req.body.customerName + ' ' + req.body.noteInvoice + ' ' + req.params.invoiceID
+            })
+        } else {
+            await db('tbl_box_transaction').insert({
+                shelfID: 1,
+                sourceID: req.params.invoiceID,
+                amount: -1 * req.body.totalPay,
+                amountIQD: -1 * req.body.totalPayIQD,
+                type: req.body.stockType,
+                userID: (jwt.verify(req.headers.authorization.split(' ')[1], process.env.KEY)).userID,
+                note: req.body.note3 + ' ' + req.body.customerName
+            })
         }
-
+             
         if(req.body.customerID != 1) {
             await db('tbl_transactions').insert({
                 sourceID: req.params.invoiceID,
@@ -380,7 +413,8 @@ router.patch('/sellInvoice/:invoiceID', async(req,res) => {
                 accountType: 'c',
                 accountName: req.body.customerName,
                 totalPrice: req.body.stockType == 's' ? req.body.totalPrice * (-1) : req.body.totalPrice,
-                totalPay: req.body.totalPay,
+                totalPay: req.body.stockType == 's' ?  req.body.totalPay <= 0 && req.body.totalPayIQD > 0 ? req.body.totalPayIQD / req.body.dollarPrice : req.body.totalPay : 0,
+                totalPayIQD: req.body.totalPayIQD,
                 transactionType: req.body.invoiceType,
                 userID: (jwt.verify(req.headers.authorization.split(' ')[1], process.env.KEY)).userID
             })

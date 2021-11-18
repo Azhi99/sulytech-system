@@ -8,6 +8,7 @@ router.post('/addTransaction', async (req, res) => {
         shelfID: req.body.shelfID,
         sourceID: req.body.sourceID,
         amount: req.body.type == 'in' ? req.body.amount : req.body.amount * -1,
+        amountIQD: req.body.type == 'in' ? req.body.amountIQD : req.body.amountIQD * -1,
         type: req.body.type,
         note: req.body.note || null,
         userID: (jwt.verify(req.headers.authorization.split(' ')[1], process.env.KEY)).userID
@@ -23,6 +24,7 @@ router.patch('/updateTransaction/:btID', async (req, res) => {
             shelfID: req.body.shelfID,
             sourceID: req.body.sourceID,
             amount: req.body.type == 'in' ? req.body.amount : req.body.amount * -1,
+            amountIQD: req.body.type == 'in' ? req.body.amountIQD : req.body.amountIQD * -1,
             type: req.body.type,
             note: req.body.note || null
         });
@@ -48,6 +50,7 @@ router.get('/getAll/:from/:to', async (req, res) => {
         tbl_shelfs.shelfName as shelfName,
         tbl_box_transaction.sourceID as sourceID,
         tbl_box_transaction.amount as amount,
+        tbl_box_transaction.amountIQD as amountIQD,
         tbl_box_transaction.type as type,
         tbl_box_transaction.note as note,
         tbl_box_transaction.createAt as createAt,
@@ -59,5 +62,38 @@ router.get('/getAll/:from/:to', async (req, res) => {
     `);
     res.status(200).send(transactions);
 });
+
+router.get('/totalMoney/:shelfID', async(req,res) => {
+    try {
+        const [[{amount}]] = await db.raw(`select sum(amount) as amount from tbl_box_transaction where tbl_box_transaction.shelfID = ${req.params.shelfID} `)
+        const [[{amountIQD}]] = await db.raw(`select sum(amountIQD) as amountIQD from tbl_box_transaction where tbl_box_transaction.shelfID = ${req.params.shelfID} `)
+        res.status(200).send({
+            amount,
+            amountIQD
+        })
+    } catch (error) {
+        res.status(500).send(error)
+    }
+})
+
+//exchange money between $ and dinar
+ router.post('/exchangeMoney', async(req,res) => {
+     try {
+        const [btID] = await db('tbl_box_transaction').insert({
+            shelfID: req.body.shelfID,
+            sourceID: req.body.sourceID,
+            amount:  req.body.amount,
+            amountIQD: req.body.amountIQD ,
+            type: 'ex',
+            note: req.body.note || null,
+            userID: (jwt.verify(req.headers.authorization.split(' ')[1], process.env.KEY)).userID
+        });
+        res.status(200).send({
+            btID
+        });
+     } catch (error) {
+         res.status(500).send(error)
+     }
+ })
 
 module.exports = router;
