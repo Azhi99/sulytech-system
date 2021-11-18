@@ -11,6 +11,7 @@ router.post('/addPurchase', async (req, res) => {
             dollarPrice: req.body.dollarPrice,
             totalPrice: req.body.totalPrice,
             amountPay: req.body.amountPay,
+            amountPayIQD: req.body.amountPayIQD,
             PurchaseStatus: req.body.PurchaseStatus,
             paymentType: req.body.paymentType,
             debtStatus: '0',
@@ -26,7 +27,8 @@ router.post('/addPurchase', async (req, res) => {
             accountType: 's',
             accountName: req.body.supplierName,
             totalPrice: req.body.stockType == 'p' ? req.body.totalPrice : req.body.totalPrice * -1,
-            totalPay: req.body.amountPay,
+            totalPay: req.body.stockType == 'p' ? (req.body.amountPay <= 0 && req.body.amountPayIQD > 0 ? (req.body.amountPayIQD / req.body.dollarPrice) : req.body.amountPay + (req.body.amountPayIQD / req.body.dollarPrice)) : 0,
+            totalPayIQD: req.body.amountPayIQD,
             transactionType: req.body.paymentType,
             userID: (jwt.verify(req.headers.authorization.split(' ')[1], process.env.KEY)).userID
         });
@@ -34,6 +36,7 @@ router.post('/addPurchase', async (req, res) => {
             shelfID: 1,
             sourceID: purchaseID,
             amount: req.body.stockType == 'p' ? req.body.amountPay * -1 : req.body.amountPay,
+            amountIQD: req.body.stockType == 'p' ? req.body.amountPayIQD * -1 : req.body.amountPayIQD,
             type: req.body.stockType,
             note: `کڕینی کاڵا لە بە ژمارە وەصڵی ${req.body.referenceNo}`,
             userID: (jwt.verify(req.headers.authorization.split(' ')[1], process.env.KEY)).userID
@@ -89,7 +92,8 @@ router.post('/addItem', async (req, res) => {
 
         await db('tbl_transactions').where('sourceID', req.body.purchaseID).andWhere('sourceType', req.body.stockType).update({
             totalPrice: req.body.totalPrice,
-            totalPay: req.body.amountPay
+            totalPay: req.body.amountPay <= 0 && req.body.amountPayIQD > 0 ? req.body.amountPayIQD /  req.body.dollarPrice : req.body.amountPay,
+            totalPayIQD: req.body.amountPayIQD 
         });
 
         res.status(200).send({
@@ -110,15 +114,18 @@ router.patch('/updatePurchase', async (req, res) => {
             referenceNo: req.body.referenceNo,
             supplierID: req.body.supplierID,
             amountPay: req.body.amountPay,
+            amountPayIQD: req.body.amountPayIQD,
             PurchaseStatus: req.body.PurchaseStatus,
             note: req.body.note
         });
         await db('tbl_transactions').where('sourceID', req.body.purchaseID).andWhere('sourceType', req.body.stockType).update({
             totalPrice: req.body.totalPrice,
-            totalPay: req.body.amountPay
+            totalPay: req.body.stockType == 'p' ? (req.body.amountPay <= 0 && req.body.amountPayIQD > 0 ? (req.body.amountPayIQD / req.body.dollarPrice) : req.body.amountPay + (req.body.amountPayIQD / req.body.dollarPrice)) : 0,
+            totalPayIQD: req.body.amountPayIQD
         });
         await db('tbl_box_transaction').where('sourceID', req.body.purchaseID).andWhere('type', req.body.stockType).update({
-            amount: req.body.amountPay
+            amount: req.body.amountPay,
+            amountPayIQD: req.body.amountPayIQD
         });
         res.sendStatus(200);
     } catch (error) {
@@ -199,6 +206,7 @@ router.get('/getPurchases/:from/:to', async (req, res) => {
         tbl_purchases.dollarPrice as dollarPrice,
         tbl_purchases.totalPrice as totalPrice,
         tbl_purchases.amountPay as amountPay,
+        tbl_purchases.amountPayIQD as amountPayIQD,
         tbl_purchases.PurchaseStatus as PurchaseStatus,
         tbl_purchases.paymentType as paymentType,
         tbl_purchases.stockType as stockType,

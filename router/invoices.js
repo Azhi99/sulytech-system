@@ -413,7 +413,7 @@ router.patch('/sellInvoice/:invoiceID', async(req,res) => {
                 accountType: 'c',
                 accountName: req.body.customerName,
                 totalPrice: req.body.stockType == 's' ? req.body.totalPrice * (-1) : req.body.totalPrice,
-                totalPay: req.body.stockType == 's' ?  req.body.totalPay <= 0 && req.body.totalPayIQD > 0 ? req.body.totalPayIQD / req.body.dollarPrice : req.body.totalPay : 0,
+                totalPay: req.body.stockType == 's' ?  (req.body.totalPay <= 0 && req.body.totalPayIQD > 0 ? req.body.totalPayIQD / req.body.dollarPrice : req.body.totalPay + (req.body.totalPayIQD / req.body.dollarPrice)) : 0,
                 totalPayIQD: req.body.totalPayIQD,
                 transactionType: req.body.invoiceType,
                 userID: (jwt.verify(req.headers.authorization.split(' ')[1], process.env.KEY)).userID
