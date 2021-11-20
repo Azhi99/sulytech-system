@@ -125,7 +125,7 @@ router.patch('/updatePurchase', async (req, res) => {
         });
         await db('tbl_box_transaction').where('sourceID', req.body.purchaseID).andWhere('type', req.body.stockType).update({
             amount: req.body.amountPay,
-            amountPayIQD: req.body.amountPayIQD
+            amountIQD: req.body.amountPayIQD
         });
         res.sendStatus(200);
     } catch (error) {
