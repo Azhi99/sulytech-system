@@ -115,9 +115,7 @@ app.post('/verifyToken', (req, res) => {
 app.get('*', (req, res) => {
     res.sendFile(path.join(__dirname, 'dist/index.html'));
 });
-const rtlArabic = require("rtl-arabic");
-const convertedText = rtlArabic("");
-console.log(convertedText); // احبكم
+
 app.listen(process.env.PORT, () => {
     console.log(`Server started on port ${process.env.PORT}`);
 })

@@ -109,6 +109,18 @@ router.patch('/updateImage/:itemID', (req, res) => {
     })
 });
 
+router.patch('/updateItemPrice/:itemID', async (req, res) => {
+    try {
+        await db('tbl_items').where('itemID', req.params.itemID).update({
+            itemPriceRetail: req.body.itemPriceRetail,
+            itemPriceWhole: req.body.itemPriceWhole
+        });
+        res.sendStatus(200);
+    } catch (error) {
+        res.status(200).send(error);
+    }
+});
+
 router.delete('/deleteItem/:itemID', async(req,res) => {
     try {
         await db('tbl_items').where('itemID', req.params.itemID).update({
@@ -183,6 +195,12 @@ router.get('/getItemByCode/:itemCode', async (req, res) => {
 
 router.get('/getItemInfo', (req, res) => {
     db.raw(`SELECT * FROM tbl_items WHERE LOWER(itemCode) = '${req.query.search.toLowerCase()}' OR LOWER(itemName) = '${req.query.search.toLowerCase()}'`).then(([[data]]) => {
+        res.status(200).send(data);
+    });
+});
+
+router.get('/getItemByID/:itemID', (req, res) => {
+    db.raw(`SELECT * FROM tbl_items WHERE itemID = ?`, req.params.itemID).then(([[data]]) => {
         res.status(200).send(data);
     });
 });
