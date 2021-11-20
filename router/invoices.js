@@ -1,11 +1,12 @@
 const db = require('../DB/dbConfig.js')
+const checkAuth = require('../checkAuth');
 const express = require('express')
 const jwt = require('jsonwebtoken');
 require('dotenv').config();
 const keySender = require('node-key-sender');
 const router = express.Router()
 
-router.post('/addInvoice', async(req,res) => {
+router.post('/addInvoice', checkAuth, async(req,res) => {
     try {
         // const [item] = await db('tbl_items').where('itemCode', req.body.search).orWhere('itemName', req.body.search).andWhere('deleteStatus', '1').select();
         const [item] = await db.select(
@@ -125,7 +126,7 @@ router.post('/addInvoice', async(req,res) => {
     }
 })
 
-router.patch('/updateInvoice/:invoiceID', async(req,res)=> {
+router.patch('/updateInvoice/:invoiceID', checkAuth, async(req,res)=> {
     try {
         await db('tbl_invoices').where('invoiceID', req.params.invoiceID).update({
             totalPrice: req.body.totalPrice || 0,
@@ -163,14 +164,14 @@ router.patch('/updateInvoice/:invoiceID', async(req,res)=> {
     }
 })
 
-router.get('/enterKey', (req, res) => {
+router.get('/enterKey', checkAuth, (req, res) => {
     setTimeout(async () => {
         await keySender.sendKey("enter");
         res.sendStatus(200);
     }, 400)
 });
 
-router.patch('/increaseItem/:invdID/:invoiceID', async (req, res) => {
+router.patch('/increaseItem/:invdID/:invoiceID', checkAuth, async (req, res) => {
     try {
         await db('tbl_invoice_item').where('invdID', req.params.invdID).update({
             qty: db.raw('qty + 1')
@@ -196,7 +197,7 @@ router.patch('/increaseItem/:invdID/:invoiceID', async (req, res) => {
     }
 });
 
-router.patch('/decreaseItem/:invoiceID/:invdID', async (req, res) => {
+router.patch('/decreaseItem/:invoiceID/:invdID', checkAuth, async (req, res) => {
     try {
         await db('tbl_invoice_item').where('invdID', req.params.invdID).update({
             qty: db.raw('qty - 1')
@@ -224,7 +225,7 @@ router.patch('/decreaseItem/:invoiceID/:invdID', async (req, res) => {
     }
 });
 
-router.patch('/changePricetoWhole/:invdID', async (req, res) => {
+router.patch('/changePricetoWhole/:invdID', checkAuth, async (req, res) => {
     try {
         await db('tbl_invoice_item').where('invdID', req.params.invdID).update({
             productPrice: req.body.itemPriceWhole
@@ -235,7 +236,7 @@ router.patch('/changePricetoWhole/:invdID', async (req, res) => {
     }
 });
 
-router.patch('/changeQty/:invdID/:invoiceID', async (req, res) => {
+router.patch('/changeQty/:invdID/:invoiceID', checkAuth, async (req, res) => {
     try {
         await db('tbl_invoice_item').where('invdID', req.params.invdID).update({
             qty: req.body.qty
@@ -262,7 +263,7 @@ router.patch('/changeQty/:invdID/:invoiceID', async (req, res) => {
     }
 });
 
-router.patch('/changeProductPrice/:invdID/:invoiceID', async (req, res) => {
+router.patch('/changeProductPrice/:invdID/:invoiceID', checkAuth, async (req, res) => {
     try {
         await db('tbl_invoice_item').where('invdID', req.params.invdID).update({
             productPrice: req.body.productPrice
@@ -286,7 +287,7 @@ router.patch('/changeProductPrice/:invdID/:invoiceID', async (req, res) => {
 });
 
 
-router.patch('/updateTotal/:invoiceID/:stockType', async (req, res) => {
+router.patch('/updateTotal/:invoiceID/:stockType', checkAuth, async (req, res) => {
     try {
         await db('tbl_invoices').where('invoiceID', req.params.invoiceID).update({
             totalPrice: req.body.totalPrice
@@ -300,7 +301,7 @@ router.patch('/updateTotal/:invoiceID/:stockType', async (req, res) => {
     }
 })
 
-router.delete('/deleteItem/:invoiceID/:invdID/:stockType/:itemID', async(req,res) => {
+router.delete('/deleteItem/:invoiceID/:invdID/:stockType/:itemID', checkAuth, async(req,res) => {
     try {
         await db('tbl_invoice_item').where('invdID', req.params.invdID).del()
         const [{noOfItem}] = await db('tbl_invoice_item').where('invoiceID', req.params.invoiceID).count('* as noOfItem')
@@ -324,7 +325,7 @@ router.delete('/deleteItem/:invoiceID/:invdID/:stockType/:itemID', async(req,res
     }
 })
 
-router.patch('/sellInvoice/:invoiceID', async(req,res) => {
+router.patch('/sellInvoice/:invoiceID', checkAuth, async(req,res) => {
     try {
         await db('tbl_invoices').where('invoiceID', req.params.invoiceID).update({
             customerID: req.body.customerID || 1,
@@ -428,7 +429,7 @@ router.patch('/sellInvoice/:invoiceID', async(req,res) => {
     }
 })
 
-router.get('/searchInvoice/:invoiceID', async (req, res) => {
+router.get('/searchInvoice/:invoiceID', checkAuth, async (req, res) => {
     const [invoice] = await db.select(
         'tbl_invoices.invoiceID',
         'tbl_customers.customerID',
@@ -471,7 +472,7 @@ router.get('/searchInvoice/:invoiceID', async (req, res) => {
     });
 });
 
-router.get('/getUnsoldedInvoices/:userID', async (req, res) => {
+router.get('/getUnsoldedInvoices/:userID', checkAuth, async (req, res) => {
     const unsoldedInvoices = await db('tbl_invoices').where('userIDUpdate', req.params.userID).andWhere('sellStatus', '0').select(['invoiceID']).orderBy('invoiceID', 'asc');
     const invoiceNumbers = unsoldedInvoices.map(({invoiceID}) => invoiceID);
     res.status(200).send(invoiceNumbers);
@@ -479,7 +480,7 @@ router.get('/getUnsoldedInvoices/:userID', async (req, res) => {
 
 //invoice report
 
-router.get('/todaySold', async (req, res) => {
+router.get('/todaySold', checkAuth, async (req, res) => {
     const [todaySold] = await db.raw(`
         select 
             tbl_invoices.invoiceID,
@@ -494,7 +495,7 @@ router.get('/todaySold', async (req, res) => {
     res.status(200).send(todaySold);
 });
 
-router.get('/getTodayInvoices', async(req,res) => {
+router.get('/getTodayInvoices', checkAuth, async(req,res) => {
     try {
         const [getTodayInvoices] = await db.raw(`SELECT
                     tbl_invoices.invoiceID,
@@ -537,7 +538,7 @@ router.get('/getTodayInvoices', async(req,res) => {
     }
 })
 
-router.get('/getAllInvoices/:from/:to', async(req,res) => {
+router.get('/getAllInvoices/:from/:to', checkAuth, async(req,res) => {
     try {
         const [allInvoices] = await db.raw(`SELECT
             tbl_invoices.invoiceID,
@@ -564,7 +565,7 @@ router.get('/getAllInvoices/:from/:to', async(req,res) => {
     }
 })
 
-router.get('/getSaleByOwner', async(req,res) => {
+router.get('/getSaleByOwner', checkAuth, async(req,res) => {
     try {
         const [getSaleByOwner] = await db.raw(`SELECT
         tbl_items.itemID AS itemID,
