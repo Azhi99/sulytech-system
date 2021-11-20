@@ -4,6 +4,7 @@ const multer = require('multer');
 const path = require('path');
 const fs = require('fs');
 const jwt = require('jsonwebtoken');
+const checkAuth = require('../checkAuth');
 require('dotenv').config();
 const router = express.Router()
 
@@ -26,7 +27,7 @@ const upload = multer({
     }
 }).single('itemImage');
 
-router.post('/addItem', async(req,res) => {
+router.post('/addItem', checkAuth, async(req,res) => {
     try {
         upload(req, res, async (err) => {
             if(!err) {
@@ -63,7 +64,7 @@ router.post('/addItem', async(req,res) => {
     }
 })
 
-router.patch('/updateItem/:itemID', async(req,res) => {
+router.patch('/updateItem/:itemID', checkAuth, async(req,res) => {
     try {
         await db('tbl_items').where('itemID', req.params.itemID).update({
             itemCode: req.body.itemCode,
@@ -89,7 +90,7 @@ router.patch('/updateItem/:itemID', async(req,res) => {
     }
 })
 
-router.patch('/updateImage/:itemID', (req, res) => {
+router.patch('/updateImage/:itemID', checkAuth, (req, res) => {
     upload(req, res, async (err) => {
         if(!err && req.file) {
             const [{oldImage}] = await db('tbl_items').where('itemID', req.params.itemID).select(['image as oldImage']);
@@ -109,7 +110,7 @@ router.patch('/updateImage/:itemID', (req, res) => {
     })
 });
 
-router.patch('/updateItemPrice/:itemID', async (req, res) => {
+router.patch('/updateItemPrice/:itemID', checkAuth, async (req, res) => {
     try {
         await db('tbl_items').where('itemID', req.params.itemID).update({
             itemPriceRetail: req.body.itemPriceRetail,
@@ -121,7 +122,7 @@ router.patch('/updateItemPrice/:itemID', async (req, res) => {
     }
 });
 
-router.delete('/deleteItem/:itemID', async(req,res) => {
+router.delete('/deleteItem/:itemID', checkAuth, async(req,res) => {
     try {
         await db('tbl_items').where('itemID', req.params.itemID).update({
             deleteStatus: '0'
@@ -132,13 +133,13 @@ router.delete('/deleteItem/:itemID', async(req,res) => {
     }
 })
 
-router.delete('/deleteImage/:itemID', async (req, res) => {
+router.delete('/deleteImage/:itemID', checkAuth, async (req, res) => {
     const [{image}] = await db('tbl_items').where('itemID', req.params.itemID).select(['image']);
     fs.unlinkSync('./Images/Items/' + image);
     res.sendStatus(200);
 })
 
-router.get('/allItems', async (req, res) => {
+router.get('/allItems', checkAuth, async (req, res) => {
     const items = await db.select(
         'tbl_items.itemID',
         'tbl_items.itemCode',
@@ -171,7 +172,7 @@ router.get('/allItems', async (req, res) => {
     res.status(200).send(items);
 });
 
-router.get('/countAllItems', async (req, res) => {
+router.get('/countAllItems', checkAuth, async (req, res) => {
     const [{numberOfItems}] = await db('tbl_items').where('deleteStatus', '1').count('* as numberOfItems');
     const [[{numberOfAllQtyItems}]] = await db.raw(`SELECT SUM(tbl_stock.qty) AS numberOfAllQtyItems FROM tbl_stock`)
     const [[{inToStock}]] = await db.raw(`SELECT IFNULL(SUM(tbl_stock.qty),0) AS inToStock FROM tbl_stock WHERE sourceType IN ('p','rs') and date(createAt) = "${new Date().toISOString().split('T')[0]}"`)
@@ -188,24 +189,24 @@ router.get('/image/:name', (req, res) => {
     res.sendFile(path.join(__dirname, '../Images/Items/' + req.params.name));
 });
 
-router.get('/getItemByCode/:itemCode', async (req, res) => {
+router.get('/getItemByCode/:itemCode', checkAuth, async (req, res) => {
     const [item] = await db('tbl_items').where('itemCode', req.params.itemCode).select();
     res.status(200).send(item || null);
 });
 
-router.get('/getItemInfo', (req, res) => {
+router.get('/getItemInfo', checkAuth, (req, res) => {
     db.raw(`SELECT * FROM tbl_items WHERE LOWER(itemCode) = '${req.query.search.toLowerCase()}' OR LOWER(itemName) = '${req.query.search.toLowerCase()}'`).then(([[data]]) => {
         res.status(200).send(data);
     });
 });
 
-router.get('/getItemByID/:itemID', (req, res) => {
+router.get('/getItemByID/:itemID', checkAuth, (req, res) => {
     db.raw(`SELECT * FROM tbl_items WHERE itemID = ?`, req.params.itemID).then(([[data]]) => {
         res.status(200).send(data);
     });
 });
 
-router.get('/getItem', (req, res) => {
+router.get('/getItem', checkAuth, (req, res) => {
     db.raw(`select 
         itemID,
         itemCode,
@@ -221,7 +222,7 @@ router.get('/getItem', (req, res) => {
     }) 
 })
 
-router.get('/getButtonItems/:categoryID', async (req, res) => {
+router.get('/getButtonItems/:categoryID', checkAuth, async (req, res) => {
     const items = await db('tbl_items').where('categoryID', req.params.categoryID).andWhere('deleteStatus', '1').andWhere('showButton', '1').select([
         'itemID',
         'itemCode',
@@ -235,7 +236,7 @@ router.get('/getButtonItems/:categoryID', async (req, res) => {
     res.status(200).send(items);
 });
 
-router.get('/getUnitInfo/:itemID', async (req, res) => {
+router.get('/getUnitInfo/:itemID', checkAuth, async (req, res) => {
     const [item] = await db.select(
         'tbl_items.perUnit as perUnit',
         'tbl_items.itemPriceWhole as itemPriceWhole',
@@ -245,7 +246,7 @@ router.get('/getUnitInfo/:itemID', async (req, res) => {
     res.status(200).send(item);
 });
 
-router.get('/getItemForShowInvoice/:search/:wholeSell', async (req, res) => {
+router.get('/getItemForShowInvoice/:search/:wholeSell', checkAuth, async (req, res) => {
     const [item] = await db.select(
         'tbl_items.itemID as itemID',
         'tbl_items.itemName as itemName',
@@ -281,7 +282,7 @@ router.get('/getItemForShowInvoice/:search/:wholeSell', async (req, res) => {
 
 // Disposal Route
 
-router.post('/addDisposal', async(req,res) => {
+router.post('/addDisposal', checkAuth, async(req,res) => {
     try {
        const  [disposalID] = await db('tbl_disposals').insert({
             itemID: req.body.itemID,
@@ -309,7 +310,7 @@ router.post('/addDisposal', async(req,res) => {
     }
 })
 
-router.patch('/updateDisposal/:disposalID', async(req,res) => {
+router.patch('/updateDisposal/:disposalID', checkAuth, async(req,res) => {
     try {
        const updateDisposal = await db('tbl_disposals').where('disposalID', req.params.disposalID).update({
             itemID: req.body.itemID,
@@ -337,7 +338,7 @@ router.patch('/updateDisposal/:disposalID', async(req,res) => {
     }
 })
 
-router.delete('/deleteDisposal/:disposalID/:itemID', async(req,res) => {
+router.delete('/deleteDisposal/:disposalID/:itemID', checkAuth, async(req,res) => {
     try {
         await db('tbl_disposals').where('disposalID', req.params.disposalID).del()
 
@@ -351,7 +352,7 @@ router.delete('/deleteDisposal/:disposalID/:itemID', async(req,res) => {
     }
 })
 
-router.get('/disposalToday', async(req,res) => {
+router.get('/disposalToday', checkAuth, async(req,res) => {
     try {
         const [disposalToday] = await db.raw(`SELECT
         tbl_disposals.disposalID,
@@ -376,7 +377,7 @@ router.get('/disposalToday', async(req,res) => {
     }
 })
 
-router.get('/oneDateDisposal/:from', async(req,res) => {
+router.get('/oneDateDisposal/:from', checkAuth, async(req,res) => {
     try {
         const [oneDateDisposal] = await db.raw(`SELECT
         tbl_disposals.disposalID,
@@ -401,7 +402,7 @@ router.get('/oneDateDisposal/:from', async(req,res) => {
     }
 })
 
-router.get('/betweenDateDisposal/:from/:to', async(req,res) => {
+router.get('/betweenDateDisposal/:from/:to', checkAuth, async(req,res) => {
     try {
         const [betweenDateDisposal] = await db.raw(`SELECT
         tbl_disposals.disposalID,
@@ -428,7 +429,7 @@ router.get('/betweenDateDisposal/:from/:to', async(req,res) => {
 
 //stock and reports of items
 
-router.get('/inStock', async(req,res) => {
+router.get('/inStock', checkAuth, async(req,res) => {
     try {
         const [inStock] = await db.raw(`SELECT
         tbl_items.itemID AS itemID,
@@ -460,7 +461,7 @@ router.get('/inStock', async(req,res) => {
     }
 })
 
-router.get('/lackInStock', async(req,res) => {
+router.get('/lackInStock', checkAuth, async(req,res) => {
     try {
         const [inStock] = await db.raw(`SELECT
         tbl_items.itemID AS itemID,
@@ -483,7 +484,7 @@ router.get('/lackInStock', async(req,res) => {
     }
 })
 
-router.get('/inStockDeatil/:itemID', async(req,res) => {
+router.get('/inStockDeatil/:itemID', checkAuth, async(req,res) => {
     try {
         const [inStockDetail] = await db.raw(`SELECT
         tbl_items.itemID AS itemID,
@@ -509,7 +510,7 @@ router.get('/inStockDeatil/:itemID', async(req,res) => {
     }
 })
 
-router.get('/moveFromToInStock/:fromDate/:toDate', async(req,res) => {
+router.get('/moveFromToInStock/:fromDate/:toDate', checkAuth, async(req,res) => {
     try {
         const [[{inToStock}]] = await db.raw(`SELECT IFNULL(SUM(tbl_stock.qty),0) AS inToStock FROM tbl_stock WHERE sourceType IN ('p','rs') and (Date(createAt) between "${req.params.fromDate}" and "${req.params.toDate}" )`)
         const [[{outFromStock}]] = await db.raw(`SELECT IFNULL(SUM(tbl_stock.qty),0) * -1 AS outFromStock FROM tbl_stock WHERE sourceType IN ('s','rp') and (Date(createAt) between "${req.params.fromDate}" and "${req.params.toDate}" )`)
@@ -548,7 +549,7 @@ router.get('/moveFromToInStock/:fromDate/:toDate', async(req,res) => {
     }
 })
 
-router.get('/moneyInStock', async(req,res) => {
+router.get('/moneyInStock', checkAuth, async(req,res) => {
     try {
         const [moneyInStock] = await db.raw(`SELECT 
         tbl_items.itemID,
@@ -570,7 +571,7 @@ router.get('/moneyInStock', async(req,res) => {
     }
 })
 
-router.get('/getItemForPurchase/:itemCode', async(req,res) => {
+router.get('/getItemForPurchase/:itemCode', checkAuth, async(req,res) => {
     try {
         const [getItemForPurchase] = await db('tbl_items').where('itemCode', req.params.itemCode).select([
             'itemID',
@@ -588,7 +589,7 @@ router.get('/getItemForPurchase/:itemCode', async(req,res) => {
     }
 })
 
-router.get('/getProfitByItem/:from/:to', async(req,res) => {
+router.get('/getProfitByItem/:from/:to', checkAuth, async(req,res) => {
     try {
         const [getProfitByItem] = await db.raw(`SELECT
         tbl_items.itemID,
@@ -620,7 +621,7 @@ router.get('/getProfitByItem/:from/:to', async(req,res) => {
     }
 })
 
-router.get('/getSoldedItems/:from/:to', async (req, res) => {
+router.get('/getSoldedItems/:from/:to', checkAuth, async (req, res) => {
     const [items] = await db.raw(`
         SELECT 
             tbl_items.itemCode as itemCode, 

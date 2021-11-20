@@ -30,7 +30,7 @@ const boxRouter = require('./router/boxTransaction.js')
 
 app.use('/essential', checkAuth, essentialRouter)
 app.use('/user', userRouter)
-app.use('/item', checkAuth, itemRouter)
+app.use('/item', itemRouter)
 app.use('/expense', checkAuth, expenseRouter)
 app.use('/supplier', checkAuth, supplierRouter)
 app.use('/customer', checkAuth, customerRouter)
