@@ -329,7 +329,8 @@ router.patch('/sellInvoice/:invoiceID', async(req,res) => {
         await db('tbl_invoices').where('invoiceID', req.params.invoiceID).update({
             customerID: req.body.customerID || 1,
             totalPrice: req.body.totalPrice || 0,
-            totalPay: req.body.totalPay <= 0 && req.body.totalPayIQD > 0 ? req.body.totalPayIQD / req.body.dollarPrice : req.body.totalPay || 0, 
+            totalPay: req.body.totalPay || 0,
+            totalPayIQD: req.body.totalPayIQD || 0, 
             discount: req.body.discount || 0,
             stockType: req.body.stockType || 's',
             sellStatus: '1',
@@ -438,6 +439,7 @@ router.get('/searchInvoice/:invoiceID', async (req, res) => {
         'tbl_invoices.invoiceType',
         'tbl_invoices.sellStatus',
         'tbl_invoices.totalPay',
+        'tbl_invoices.totalPayIQD',
         'tbl_invoices.dollarPrice',
         'tbl_users.fullName',
     ).from('tbl_invoices')

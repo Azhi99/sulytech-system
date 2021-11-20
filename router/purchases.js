@@ -119,7 +119,7 @@ router.patch('/updatePurchase', async (req, res) => {
             note: req.body.note
         });
         await db('tbl_transactions').where('sourceID', req.body.purchaseID).andWhere('sourceType', req.body.stockType).update({
-            totalPrice: req.body.totalPrice,
+            totalPrice: req.body.stockType == 'p' ? req.body.totalPrice : req.body.totalPrice * -1,
             totalPay: req.body.stockType == 'p' ? (req.body.amountPay <= 0 && req.body.amountPayIQD > 0 ? (req.body.amountPayIQD / req.body.dollarPrice) : req.body.amountPay + (req.body.amountPayIQD / req.body.dollarPrice)) : 0,
             totalPayIQD: req.body.amountPayIQD
         });

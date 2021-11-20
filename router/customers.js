@@ -129,7 +129,7 @@ router.post('/addReturnDebt', async(req,res) => {
         const [rdcID] = await db('tbl_return_debt_customer').insert({
             customerID: req.body.customerID,
             shelfID: req.body.shelfID,
-            amountReturn: ((req.body.amountReturn + dinar) - req.body.discount) || 0,
+            amountReturn: (req.body.amountReturn + dinar) || 0,
             amountReturnIQD:  req.body.amountReturnIQD || 0,
             discount: req.body.discount || 0,
             dollarPrice: req.body.dollarPrice || 0,
@@ -140,7 +140,7 @@ router.post('/addReturnDebt', async(req,res) => {
         await db('tbl_box_transaction').insert({
             shelfID: req.body.shelfID,
             sourceID: rdcID,
-            amount: req.body.amountReturn,
+            amount: req.body.amountReturn - req.body.discount,
             amountIQD: req.body.amountReturnIQD,
             type: 'rds',
             note:  req.body.note + ' ' + req.body.customerName ,
@@ -163,7 +163,7 @@ router.post('/addReturnDebt', async(req,res) => {
                 accountID: req.body.customerID,
                 accountType: 'c',
                 accountName: req.body.customerName,
-                totalPrice: ((req.body.amountReturn + dinar) - req.body.discount),
+                totalPrice: (req.body.amountReturn + dinar),
                 transactionType: 'rd',
                 userID: (jwt.verify(req.headers.authorization.split(' ')[1], process.env.KEY)).userID
             })
