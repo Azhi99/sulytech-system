@@ -16,12 +16,12 @@ router.post('/addInvoice', checkAuth, async(req,res) => {
             'tbl_items.itemPriceRetail as itemPriceRetail',
             'tbl_items.itemPriceWhole as itemPriceWhole',
             'tbl_items.costPrice as costPrice',
-            'tbl_items.shelfID as shelfID',
-            'tbl_shelfs.shelfName as shelfName',
+            // 'tbl_items.shelfID as shelfID',
+            // 'tbl_shelfs.shelfName as shelfName',
             'tbl_items.unitID as unitID',
             'tbl_units.unitName as unitName'
         ).from('tbl_items')
-         .join('tbl_shelfs', 'tbl_items.shelfID', '=', 'tbl_shelfs.shelfID')
+        //  .join('tbl_shelfs', 'tbl_items.shelfID', '=', 'tbl_shelfs.shelfID')
          .join('tbl_units', 'tbl_items.unitID', '=', 'tbl_units.unitID')
          .whereRaw(`LOWER(tbl_items.itemCode)='${req.body.search.toLowerCase()}'`)
          .orWhereRaw(`LOWER(tbl_items.itemName)='${req.body.search.toLowerCase()}'`)
@@ -56,7 +56,7 @@ router.post('/addInvoice', checkAuth, async(req,res) => {
                 qty: req.body.wholeSell ? item.perUnit : 1,
                 productPrice: req.body.wholeSell ? item.itemPriceWhole : item.itemPriceRetail,
                 costPrice: item.costPrice,
-                shelfID: item.shelfID,
+                // shelfID: item.shelfID,
                 unitID: item.unitID
             })
 
@@ -67,7 +67,7 @@ router.post('/addInvoice', checkAuth, async(req,res) => {
                 itemName: item.itemName,
                 qty: req.body.wholeSell ? item.perUnit : 1,
                 productPrice: req.body.wholeSell ? item.itemPriceWhole : item.itemPriceRetail,
-                shelfName: item.shelfName,
+                // shelfName: item.shelfName,
                 unitName: item.unitName,
                 message: 'Invoice Created'
             })
@@ -81,7 +81,7 @@ router.post('/addInvoice', checkAuth, async(req,res) => {
                     qty,
                     productPrice: req.body.wholeSell ? item.itemPriceWhole : item.itemPriceRetail,
                     costPrice: item.costPrice,
-                    shelfID: item.shelfID,
+                    // shelfID: item.shelfID,
                     unitID: item.unitID
                 })
                 if(req.body.sellStatus == 1) {
@@ -90,7 +90,7 @@ router.post('/addInvoice', checkAuth, async(req,res) => {
                         sourceType: req.body.stockType,
                         itemID: item.itemID,
                         qty: req.body.stockType == 's' ? qty * (-1) : qty,
-                        itemPirce: req.body.wholeSell ? item.itemPriceWhole : item.itemPriceRetail,
+                        itemPrice: req.body.wholeSell ? item.itemPriceWhole : item.itemPriceRetail,
                         costPrice: item.costPrice
                     });
                 }
@@ -458,11 +458,11 @@ router.get('/searchInvoice/:invoiceID', checkAuth, async (req, res) => {
         'tbl_items.itemName as itemName',
         'tbl_invoice_item.qty as qty',
         'tbl_invoice_item.productPrice as productPrice',
-        'tbl_shelfs.shelfName as shelfName',
+        // 'tbl_shelfs.shelfName as shelfName',
         'tbl_units.unitName as unitName'
     ).from('tbl_invoice_item')
      .join('tbl_items', 'tbl_items.itemID', '=', 'tbl_invoice_item.itemID')
-     .join('tbl_shelfs', 'tbl_invoice_item.shelfID', '=', 'tbl_shelfs.shelfID')
+    //  .join('tbl_shelfs', 'tbl_invoice_item.shelfID', '=', 'tbl_shelfs.shelfID')
      .join('tbl_units', 'tbl_invoice_item.unitID', '=', 'tbl_units.unitID')
      .where('tbl_invoice_item.invoiceID', req.params.invoiceID);
 
@@ -481,13 +481,17 @@ router.get('/getUnsoldedInvoices/:userID', checkAuth, async (req, res) => {
 //invoice report
 
 router.get('/todaySold', checkAuth, async (req, res) => {
+    
     const [todaySold] = await db.raw(`
         select 
             tbl_invoices.invoiceID,
             tbl_customers.customerName,
             tbl_invoices.totalPrice,
             tbl_invoices.invoiceType,
-            tbl_invoices.discount
+            tbl_invoices.discount,
+            tbl_invoices.stockType,
+            tbl_invoices.totalPay,
+            tbl_invoices.totalPayIQD
         from tbl_invoices join tbl_customers on (tbl_invoices.customerID = tbl_customers.customerID)
         where tbl_invoices.sellStatus = '1' and tbl_invoices.stockType = 's' and date(tbl_invoices.createAt) = '${new Date().toISOString().split('T')[0]}' 
     `);
@@ -595,5 +599,70 @@ router.get('/getSaleByOwner', checkAuth, async(req,res) => {
     }
 })
 
+
+//report item sold by customer
+router.get('/itemSoldByCustomer/:customerID', async(req,res) => {
+    try {
+        const [itemSoldByCustomer] = await db.raw(`
+                        SELECT
+                tbl_customers.customerID,
+                tbl_invoices.invoiceID,
+                tbl_items.itemCode,
+                tbl_items.itemName,
+                tbl_invoice_item.qty,
+                tbl_invoice_item.productPrice,
+                date(tbl_invoices.createAt) as createAt
+                FROM tbl_invoices
+                INNER JOIN tbl_invoice_item
+                    ON tbl_invoice_item.invoiceID = tbl_invoices.invoiceID
+                INNER JOIN tbl_customers
+                    ON tbl_customers.customerID = tbl_invoices.customerID
+                INNER JOIN tbl_items
+                    ON tbl_invoice_item.itemID = tbl_items.itemID
+                    where tbl_invoices.customerID = "${req.params.customerID}"
+                ORDER BY tbl_invoices.createAt DESC`)
+
+                res.status(200).send({
+                    itemSoldByCustomer
+                })
+    } catch (error) {
+        res.status(500).send({
+            error
+        })
+    }
+})
+
+router.get('/previousInvoice/:invID', async(req,res) => {
+    try {
+        if(req.params.invID == "null" || req.params.invID == "undefined" || req.params.invID == null) {
+            const [[{invoiceID}]] = await db.raw('select invoiceID from tbl_invoices order by invoiceID desc limit 1')
+            res.status(200).send({invoiceID})
+        }
+        else {
+            const [[{invoiceID}]] = await db.raw(`select invoiceID from tbl_invoices where invoiceID < ${req.params.invID} order by invoiceID desc limit 1`)
+            res.status(200).send({
+                invoiceID
+            })
+
+        }
+    } catch (error) {
+        res.status(500).send({
+            error
+        })
+    }
+})
+
+router.get('/nextInvoice/:invID', async(req,res) => {
+    try {
+        const [[{invoiceID}]] = await db.raw(`select invoiceID from tbl_invoices where invoiceID > ${req.params.invID} order by invoiceID asc limit 1`)
+        res.status(200).send({
+            invoiceID
+        })
+    } catch (error) {
+        res.status(500).send({
+            error
+        })
+    }
+})
 
 module.exports = router

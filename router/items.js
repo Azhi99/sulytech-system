@@ -216,7 +216,7 @@ router.get('/getItem', checkAuth, (req, res) => {
         itemPriceWhole,
         perUnit
         from tbl_items 
-            where LOWER(itemCode) like "${req.query.search.toLowerCase()}%" or LOWER(itemName) like "${req.query.search.toLowerCase()}%"
+            where LOWER(itemCode) like "%${req.query.search.toLowerCase()}%" or LOWER(itemName) like "%${req.query.search.toLowerCase()}%"
     `).then(([data]) => {
         res.status(200).send(data)
     }) 
