@@ -657,4 +657,117 @@ router.get('/getSoldedItems/:from/:to', checkAuth, async (req, res) => {
     });
 });
 
+// Discount Routes
+
+router.post('/addDiscount', async (req, res) => {
+    try {
+        const [dID] = await db('tbl_discounts').insert({
+            itemID: req.body.itemID,
+            itemPriceRetail: req.body.itemPriceRetail,
+            discount: req.body.discount,
+            priceAfterDiscount: req.body.priceAfterDiscount,
+            startDate: req.body.startDate,
+            endDate: req.body.endDate,
+            userID: (jwt.verify(req.headers.authorization.split(' ')[1], process.env.KEY)).userID,
+            started: new Date(req.body.startDate).toISOString().split('T')[0] <= new Date().toISOString().split('T')[0] ? '1' : '0'
+        });
+        if(new Date(req.body.startDate).toISOString().split('T')[0] <= new Date().toISOString().split('T')[0]) {
+            await db('tbl_items').where('itemID', req.body.itemID).update({
+                itemPriceRetail: req.body.priceAfterDiscount
+            });
+        }
+        res.status(200).send({
+            dID
+        });
+    } catch (error) {
+        res.status(500).send(error);
+    }
+});
+
+router.patch('/updateDiscount/:dID', async (req, res) => {
+    try {
+        await db('tbl_discounts').where('dID', req.params.dID).update({
+            discount: req.body.discount,
+            priceAfterDiscount: req.body.priceAfterDiscount,
+            startDate: req.body.startDate,
+            endDate: req.body.endDate,
+            started: new Date(req.body.startDate).toISOString().split('T')[0] <= new Date().toISOString().split('T')[0] ? '1' : '0'
+        });
+        if(new Date(req.body.startDate).toISOString().split('T')[0] <= new Date().toISOString().split('T')[0]) {
+            await db('tbl_items').where('itemID', req.body.itemID).update({
+                itemPriceRetail: req.body.priceAfterDiscount
+            });
+        } else {
+            await db('tbl_items').where('itemID', req.body.itemID).update({
+                itemPriceRetail: req.body.itemPriceRetail
+            });
+        }
+        res.sendStatus(200);
+    } catch (error) {
+        console.log(error);
+        res.status(500).send(error);
+    }
+});
+
+router.delete('/deleteDiscount/:dID/:itemID/:itemPriceRetail/:startDate/:endDate', async (req, res) => {
+    try {
+        if(new Date(req.params.startDate).toISOString().split('T')[0] <= new Date().toISOString().split('T')[0] && new Date(req.params.endDate).toISOString().split('T')[0] >= new Date().toISOString().split('T')[0]) {
+            const [{itemPriceRetail}] = await db('tbl_discounts').where('dID', req.params.dID).select(['itemPriceRetail']);
+            await db('tbl_items').where('itemID', req.params.itemID).update({
+                itemPriceRetail
+            });
+        }
+        await db('tbl_discounts').where('dID', req.params.dID).delete();
+        res.sendStatus(200);
+    } catch (error) {
+        console.log(error);
+        res.status(500).send(error);
+    }
+});
+
+router.get('/getDiscounts/:fromCreate/:toCreate/:fromStart/:toStart/:fromEnd/:toEnd', async (req, res) => {
+    const discounts = await db.select(
+        'tbl_discounts.dID as dID',
+        'tbl_discounts.itemID as itemID',
+        'tbl_items.itemName as itemName',
+        'tbl_discounts.itemPriceRetail as itemPriceRetail',
+        'tbl_discounts.discount as discount',
+        'tbl_discounts.priceAfterDiscount as priceAfterDiscount',
+        'tbl_discounts.createDate as createDate',
+        'tbl_discounts.startDate as startDate',
+        'tbl_discounts.endDate as endDate',
+        'tbl_discounts.userID as userID',
+        'tbl_users.userName as userName'
+    ).from('tbl_discounts')
+     .join('tbl_items', 'tbl_discounts.itemID', '=', 'tbl_items.itemID')
+     .join('tbl_users', 'tbl_discounts.userID', '=', 'tbl_users.userID')
+     .whereRaw(`DATE(tbl_discounts.createDate) BETWEEN '${new Date(req.params.fromCreate).toISOString().split('T')[0]}' AND '${new Date(req.params.toCreate).toISOString().split('T')[0]}'`)
+     .andWhereRaw(`DATE(tbl_discounts.startDate) BETWEEN '${new Date(req.params.fromStart).toISOString().split('T')[0]}' AND '${new Date(req.params.toStart).toISOString().split('T')[0]}'`)
+     .andWhereRaw(`DATE(tbl_discounts.endDate) BETWEEN '${new Date(req.params.fromEnd).toISOString().split('T')[0]}' AND '${new Date(req.params.toEnd).toISOString().split('T')[0]}'`)
+     .orderBy('tbl_discounts.startDate', 'DESC');
+     
+    res.status(200).send(discounts);
+});
+
+setInterval(async () => {
+    const [discounts] = await db.raw(`SELECT * FROM tbl_discounts WHERE DATE(startDate) <= '${new Date().toISOString().split('T')[0]}' AND started = '0'`);
+    if(discounts.length > 0) {
+        for(var item of discounts) {
+            await db('tbl_items').where('itemID', item.itemID).update({
+                itemPriceRetail: item.priceAfterDiscount
+            });
+            await db('tbl_discounts').where('dID', item.dID).update({
+                started: '1'
+            });
+        }
+    }
+
+    const [ended] = await db.raw(`SELECT * FROM tbl_discounts WHERE DATE(endDate) <= '${new Date().toISOString().split('T')[0]}' AND started = '1'`);
+    for(var item of ended) {
+        await db('tbl_items').where('itemID', item.itemID).update({
+            itemPriceRetail: item.itemPriceRetail
+        });
+    }
+}, 3 * 60 * 60 * 1000)
+
 module.exports = router
