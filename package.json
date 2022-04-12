@@ -8,12 +8,12 @@
   },
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/Azhi99/lavanta.git"
+    "url": "git+https://github.com/Azhi99/sulytech-system.git"
   },
   "author": "suly tech",
   "license": "ISC",
   "bugs": {
-    "url": "https://github.com/Azhi99/lavanta/issues"
+    "url": "https://github.com/Azhi99/sulytech-system/issues"
   },
   "dependencies": {
     "bcrypt": "^5.0.1",
