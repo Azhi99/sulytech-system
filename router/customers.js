@@ -42,7 +42,7 @@ router.post('/addCustomer', async(req,res) => {
     } catch (error) {
         if(error.errno == 1062) {
             return res.status(500).send({
-                message: 'This customer already exist'
+                message: 'ئەم کڕیارە داخڵ کراوە'
             })
         }
         return res.status(500).send(error)
@@ -73,7 +73,7 @@ router.patch('/updateCustomer/:customerID', async(req,res) => {
 router.patch('/deactive/:customerID', async(req,res) => {
     try {
         await db('tbl_customers').where('customerID', req.params.customerID).update({
-            activeStatus: 0
+            activeStatus: '0'
         })
          res.sendStatus(200)
     } catch (error) {
@@ -84,7 +84,7 @@ router.patch('/deactive/:customerID', async(req,res) => {
 router.patch('/active/:customerID', async(req,res) => {
     try {
         await db('tbl_customers').where('customerID', req.params.customerID).update({
-            activeStatus: 1
+            activeStatus: '1'
         })
          res.sendStatus(200)
     } catch (error) {
@@ -116,9 +116,40 @@ router.get('/allCustomers', async(req,res) => {
           ON tbl_customers.customerName = view_total_remain_debt_customer.customerName
         LEFT OUTER JOIN view_total_remain_debt_supplier
           ON tbl_customers.customerName = view_total_remain_debt_supplier.supplierName
-      WHERE tbl_customers.activeStatus = '1'
       GROUP BY tbl_customers.customerID`)
            res.status(200).send(allCustomers)
+    } catch (error) {
+        res.status(500).send(error)   
+    }
+})
+
+router.get('/activeCustomers', async(req,res) => {
+    try {
+        const [activeCustomers] = await db.raw(`SELECT
+        tbl_customers.customerID,
+        tbl_customers.customerName,
+        CONCAT(tbl_customers.customerID,'-',tbl_customers.customerName) as concatNameAndCode,
+        tbl_customers.phoneNumber,
+        tbl_customers.address,
+        tbl_customers.previousDebt,
+        tbl_customers.limitDebt,
+        tbl_customers.wholePrice,
+        tbl_customers.doesSupplier,
+        tbl_customers.createAt,
+        tbl_customers.activeStatus,
+        tbl_users.userName,
+        IF(view_total_remain_debt_customer.totalRemainCustomer - IFNULL(view_total_remain_debt_supplier.totalRemainSupplier,0) >= 0,
+              view_total_remain_debt_customer.totalRemainCustomer - IFNULL(view_total_remain_debt_supplier.totalRemainSupplier,0),0) AS totalRemain
+      FROM tbl_customers
+        INNER JOIN tbl_users
+          ON tbl_customers.userID = tbl_users.userID
+        LEFT OUTER JOIN view_total_remain_debt_customer
+          ON tbl_customers.customerName = view_total_remain_debt_customer.customerName
+        LEFT OUTER JOIN view_total_remain_debt_supplier
+          ON tbl_customers.customerName = view_total_remain_debt_supplier.supplierName
+      WHERE tbl_customers.activeStatus = '1'
+      GROUP BY tbl_customers.customerID`)
+           res.status(200).send(activeCustomers)
     } catch (error) {
         res.status(500).send(error)   
     }
