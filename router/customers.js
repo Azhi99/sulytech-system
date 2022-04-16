@@ -185,49 +185,65 @@ router.post('/addReturnDebt', async(req,res) => {
             userID: (jwt.verify(req.headers.authorization.split(' ')[1], process.env.KEY)).userID
         })
 
+        if(req.body.autoInvoiceCalculator) {
+            // Select each debt invoices that doesn't wasl
+            const debtInvoicesWithTotal = await db.select(
+                'invoiceID as invoiceID',
+                'totalPrice as totalPrice',
+                db.raw('(totalPrice - totalPay) as total')
+            ).from('tbl_invoices')
+             .where('customerID', req.body.customerID)
+             .andWhere('wasl', '0')
+             .andWhere('stockType', 's');
 
-      // for update 0 status to 1 in tbl_invoice  
-          if(req.body.invoiceNumbers.length > 0) {
-            for(let i=0;i < req.body.invoiceNumbers.length;i++) {
-                await db('tbl_invoices').where('invoiceID', req.body.invoiceNumbers[i]).update({
-                    wasl: '1'
-                })
-           } 
-          }  
-       
-        //for add rdcID to tbl_invoice
-        if(req.body.invoiceNumbers.length > 0) {
-                for(let i=0;i < req.body.invoiceNumbers.length;i++) {
-                    await db('tbl_invoices').where('invoiceID', req.body.invoiceNumbers[i]).update({
-                        rdcID: rdcID
-                    })
-            } 
-        } 
-
-
-
-        await db('tbl_box_transaction').insert({
-            shelfID: req.body.shelfID,
-            sourceID: rdcID,
-            amount: req.body.amountReturn - req.body.discount,
-            amountIQD: req.body.amountReturnIQD,
-            type: 'rds',
-            note:  req.body.note + ' ' + req.body.customerName ,
-            userID: (jwt.verify(req.headers.authorization.split(' ')[1], process.env.KEY)).userID
-        })
-
-        if(req.body.customerID != 1) {
-            await db('tbl_transactions').insert({
-                sourceID: rdcID,
-                sourceType: 'rds',
-                accountID: req.body.customerID,
-                accountType: 'c',
-                accountName: req.body.customerName,
-                totalPrice: (req.body.amountReturn + dinar),
-                transactionType: 'rd',
-                userID: (jwt.verify(req.headers.authorization.split(' ')[1], process.env.KEY)).userID
-            })
+            // Fill each amount of invoices like tanks
+            var amount = req.body.amountReturn;
+            for(let invoice of debtInvoicesWithTotal) {
+                if(amount >= invoice.total ) {
+                    await db('tbl_invoices').where('invoiceID', invoice.invoiceID).update({
+                        totalPay: invoice.totalPrice,
+                        wasl: '1',
+                        rdcID
+                    });
+                } else {
+                    await db('tbl_invoices').where('invoiceID', invoice.invoiceID).update({
+                        totalPay: amount,
+                    });
+                    break;
+                }
+                amount -= invoice.total;
+            }
+        } else {
+            await db('tbl_invoices').whereIn('invoiceID', req.body.invoiceNumbers).update({
+                wasl: '1',
+                totalPay: db.raw('totalPrice'),
+                rdcID
+            });
         }
+
+
+        // await db('tbl_box_transaction').insert({
+        //     shelfID: req.body.shelfID,
+        //     sourceID: rdcID,
+        //     amount: req.body.amountReturn - req.body.discount,
+        //     amountIQD: req.body.amountReturnIQD,
+        //     type: 'rds',
+        //     note:  req.body.note + ' ' + req.body.customerName ,
+        //     userID: (jwt.verify(req.headers.authorization.split(' ')[1], process.env.KEY)).userID
+        // })
+
+        // if(req.body.customerID != 1) {
+        //     await db('tbl_transactions').insert({
+        //         sourceID: rdcID,
+        //         sourceType: 'rds',
+        //         accountID: req.body.customerID,
+        //         accountType: 'c',
+        //         accountName: req.body.customerName,
+        //         totalPrice: (req.body.amountReturn + dinar),
+        //         transactionType: 'rd',
+        //         userID: (jwt.verify(req.headers.authorization.split(' ')[1], process.env.KEY)).userID
+        //     })
+        // }
         res.status(201).send({
             rdcID
         })
@@ -325,6 +341,17 @@ router.delete('/deleteInvoice/:rdcID/:invoiceID/:userID', async (req, res) => {
     res.sendStatus(200);
 });
 
+router.post('/calculateDebtInvoicesAmountByInvoiceNumbers', async (req, res) => {
+    const [{total}] = await db.select(
+        db.raw('sum(tbl_invoices.totalPrice - tbl_invoices.totalPay) as total')
+    ).from('tbl_invoices')
+     .whereIn('tbl_invoices.invoiceID', req.body.invoiceNumbers);
+
+    res.status(200).send({
+        total: Number(total)
+    });
+});
+
 router.get('/todayReturnDebt', async(req,res) => {
     try {
         const [todayReturnDebt] = await db.raw(`SELECT
@@ -404,9 +431,19 @@ router.get('/betweenDateReturnDebt/:from/:to', async(req,res) => {
 })
 
 router.get('/getDebtInvoices/:customerID', async (req, res) => {
-    const debtInvoices = await db('tbl_invoices').where('customerID', req.params.customerID).andWhere('wasl', '0').andWhere('stockType', 's').select(['invoiceID']).orderBy('invoiceID', 'asc');
+    const debtInvoices = await db('tbl_invoices').where('customerID', req.params.customerID).andWhere('wasl', '0').andWhere('stockType', 's').select(['invoiceID']).orderBy('createAt', 'asc');
+    const debtInvoicesWithTotal = await db.select(
+        'invoiceID as invoiceID',
+        db.raw('(totalPrice - totalPay) as total')
+    ).from('tbl_invoices')
+     .where('customerID', req.params.customerID)
+     .andWhere('wasl', '0')
+     .andWhere('stockType', 's');
     const invoices = debtInvoices.map(({invoiceID}) => invoiceID);
-    res.status(200).send(invoices);
+    res.status(200).send({
+        invoices,
+        debtInvoicesWithTotal
+    });
 });
 
 router.get('/getDebtsList', async (req, res) => {

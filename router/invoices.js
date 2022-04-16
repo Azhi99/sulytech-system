@@ -47,6 +47,8 @@ router.post('/addInvoice', checkAuth, async(req,res) => {
                 stockType: req.body.stockType || 's',
                 sellStatus: '0',
                 invoiceType: req.body.invoiceType || 'c',
+                rdcID: null,
+                wasl: req.body.invoiceType == 'c' ? '1' : '0',
                 userIDUpdate: (jwt.verify(req.headers.authorization.split(' ')[1], process.env.KEY)).userID
             })
 
@@ -336,6 +338,7 @@ router.patch('/sellInvoice/:invoiceID', checkAuth, async(req,res) => {
             stockType: req.body.stockType || 's',
             sellStatus: '1',
             invoiceType: req.body.invoiceType || 'c',
+            wasl: req.body.invoiceType == 'c' ? '1' : req.body.totalPay == req.body.totalPrice ? '1' : '0',
             userIDUpdate: (jwt.verify(req.headers.authorization.split(' ')[1], process.env.KEY)).userID
         })
     
