@@ -41,7 +41,8 @@ router.post('/addInvoice', checkAuth, async(req,res) => {
                 customerID: req.body.customerID || 1,
                 userID: (jwt.verify(req.headers.authorization.split(' ')[1], process.env.KEY)).userID,
                 totalPrice: req.body.totalPrice || 0,
-                totalPay: req.body.totalPay || 0, 
+                initialPay: req.body.initialPay || 0,
+                totalPay: 0, 
                 discount: req.body.discount || 0,
                 dollarPrice: req.body.dollarPrice || 0,
                 stockType: req.body.stockType || 's',
@@ -132,7 +133,7 @@ router.patch('/updateInvoice/:invoiceID', checkAuth, async(req,res)=> {
     try {
         await db('tbl_invoices').where('invoiceID', req.params.invoiceID).update({
             totalPrice: req.body.totalPrice || 0,
-            totalPay: req.body.totalPay || 0,
+            initialPay: req.body.initialPay || 0,
             totalPayIQD: req.body.totalPayIQD || 0,
             discount: req.body.discount || 0,
             userIDUpdate: (jwt.verify(req.headers.authorization.split(' ')[1], process.env.KEY)).userID
@@ -332,7 +333,7 @@ router.patch('/sellInvoice/:invoiceID', checkAuth, async(req,res) => {
         await db('tbl_invoices').where('invoiceID', req.params.invoiceID).update({
             customerID: req.body.customerID || 1,
             totalPrice: req.body.totalPrice || 0,
-            totalPay: req.body.totalPay || 0,
+            initialPay: req.body.initialPay || 0,
             totalPayIQD: req.body.totalPayIQD || 0, 
             discount: req.body.discount || 0,
             stockType: req.body.stockType || 's',
@@ -392,7 +393,7 @@ router.patch('/sellInvoice/:invoiceID', checkAuth, async(req,res) => {
             await db('tbl_box_transaction').insert({
                 shelfID: 1,
                 sourceID: req.params.invoiceID,
-                amount: req.body.totalPay,
+                amount: req.body.initialPay,
                 amountIQD: req.body.totalPayIQD,
                 type: req.body.stockType,
                 userID: (jwt.verify(req.headers.authorization.split(' ')[1], process.env.KEY)).userID,
@@ -402,7 +403,7 @@ router.patch('/sellInvoice/:invoiceID', checkAuth, async(req,res) => {
             await db('tbl_box_transaction').insert({
                 shelfID: 1,
                 sourceID: req.params.invoiceID,
-                amount: -1 * req.body.totalPay,
+                amount: -1 * req.body.initialPay,
                 amountIQD: -1 * req.body.totalPayIQD,
                 type: req.body.stockType,
                 userID: (jwt.verify(req.headers.authorization.split(' ')[1], process.env.KEY)).userID,
@@ -418,7 +419,7 @@ router.patch('/sellInvoice/:invoiceID', checkAuth, async(req,res) => {
                 accountType: 'c',
                 accountName: req.body.customerName,
                 totalPrice: req.body.stockType == 's' ? req.body.totalPrice * (-1) : req.body.totalPrice,
-                totalPay: req.body.stockType == 's' ?  (req.body.totalPay <= 0 && req.body.totalPayIQD > 0 ? req.body.totalPayIQD / req.body.dollarPrice : req.body.totalPay + (req.body.totalPayIQD / req.body.dollarPrice)) : 0,
+                totalPay: req.body.stockType == 's' ?  (req.body.initialPay <= 0 && req.body.totalPayIQD > 0 ? req.body.totalPayIQD / req.body.dollarPrice : req.body.initialPay + (req.body.totalPayIQD / req.body.dollarPrice)) : 0,
                 totalPayIQD: req.body.totalPayIQD,
                 transactionType: req.body.invoiceType,
                 userID: (jwt.verify(req.headers.authorization.split(' ')[1], process.env.KEY)).userID
@@ -443,6 +444,7 @@ router.get('/searchInvoice/:invoiceID', checkAuth, async (req, res) => {
         'tbl_invoices.invoiceType',
         'tbl_invoices.sellStatus',
         'tbl_invoices.totalPay',
+        'tbl_invoices.initialPay',
         'tbl_invoices.totalPayIQD',
         'tbl_invoices.dollarPrice',
         'tbl_users.fullName',
@@ -493,6 +495,7 @@ router.get('/todaySold', checkAuth, async (req, res) => {
             tbl_invoices.invoiceType,
             tbl_invoices.discount,
             tbl_invoices.stockType,
+            tbl_invoices.initialPay,
             tbl_invoices.totalPay,
             tbl_invoices.totalPayIQD
         from tbl_invoices join tbl_customers on (tbl_invoices.customerID = tbl_customers.customerID)
@@ -511,6 +514,7 @@ router.get('/getTodayInvoices', checkAuth, async(req,res) => {
                     tbl_invoices.userIDUpdate,
                     tbl_users.userName,
                     tbl_invoices.totalPrice,
+                    tbl_invoices.initialPay,
                     tbl_invoices.totalPay,
                     tbl_invoices.discount,
                     tbl_invoices.stockType,
@@ -530,7 +534,7 @@ router.get('/getTodayInvoices', checkAuth, async(req,res) => {
             WHERE date(createAt) = '${new Date().toISOString().split('T')[0]}'
         `);
         const [[{totalDebt}]] = await db.raw(`SELECT
-                SUM(totalPrice - totalPay) AS totalDebt
+                SUM(totalPrice - (initialPay + totalPay)) AS totalDebt
             FROM tbl_invoices
             WHERE date(createAt) = '${new Date().toISOString().split('T')[0]}'
         `);
@@ -554,6 +558,7 @@ router.get('/getAllInvoices/:from/:to', checkAuth, async(req,res) => {
             tbl_invoices.userIDUpdate,
             tbl_users.userName,
             tbl_invoices.totalPrice,
+            tbl_invoices.initialPay,
             tbl_invoices.totalPay,
             tbl_invoices.discount,
             tbl_invoices.stockType,

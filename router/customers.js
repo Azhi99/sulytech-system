@@ -184,41 +184,43 @@ router.post('/addReturnDebt', async(req,res) => {
             invoiceNumbers: req.body.invoiceNumbers.join(',') || null,
             userID: (jwt.verify(req.headers.authorization.split(' ')[1], process.env.KEY)).userID
         })
-
-        if(req.body.autoInvoiceCalculator) {
-            // Select each debt invoices that doesn't wasl
-            const debtInvoicesWithTotal = await db.select(
-                'invoiceID as invoiceID',
-                'totalPrice as totalPrice',
-                db.raw('(totalPrice - totalPay) as total')
-            ).from('tbl_invoices')
-             .where('customerID', req.body.customerID)
-             .andWhere('wasl', '0')
-             .andWhere('stockType', 's');
-
-            // Fill each amount of invoices like tanks
-            var amount = req.body.amountReturn;
-            for(let invoice of debtInvoicesWithTotal) {
-                if(amount >= invoice.total ) {
-                    await db('tbl_invoices').where('invoiceID', invoice.invoiceID).update({
-                        totalPay: invoice.totalPrice,
-                        wasl: '1',
-                        rdcID
-                    });
-                } else {
-                    await db('tbl_invoices').where('invoiceID', invoice.invoiceID).update({
-                        totalPay: amount,
-                    });
-                    break;
+        
+        if(req.body.invoiceNumbers) {
+            if(req.body.autoInvoiceCalculator) {
+                // Select each debt invoices that doesn't wasl
+                const debtInvoicesWithTotal = await db.select(
+                    'invoiceID as invoiceID',
+                    'totalPrice as totalPrice',
+                    db.raw('(totalPrice - (initialPay + totalPay)) as total')
+                ).from('tbl_invoices')
+                 .where('customerID', req.body.customerID)
+                 .andWhere('wasl', '0')
+                 .andWhere('stockType', 's');
+    
+                // Fill each amount of invoices like tanks
+                var amount = req.body.amountReturn + dinar;
+                for(let invoice of debtInvoicesWithTotal) {
+                    if(amount >= invoice.total ) {
+                        await db('tbl_invoices').where('invoiceID', invoice.invoiceID).update({
+                            totalPay: db.raw(`totalPrice - initialPay`),
+                            wasl: '1',
+                            rdcID
+                        });
+                    } else {
+                        await db('tbl_invoices').where('invoiceID', invoice.invoiceID).update({
+                            totalPay: db.raw(`totalPay + ${amount}`),
+                        });
+                        break;
+                    }
+                    amount -= invoice.total;
                 }
-                amount -= invoice.total;
+            } else {
+                await db('tbl_invoices').whereIn('invoiceID', req.body.invoiceNumbers).update({
+                    wasl: '1',
+                    totalPay: db.raw('totalPrice - initialPay'),
+                    rdcID
+                });
             }
-        } else {
-            await db('tbl_invoices').whereIn('invoiceID', req.body.invoiceNumbers).update({
-                wasl: '1',
-                totalPay: db.raw('totalPrice'),
-                rdcID
-            });
         }
 
 
@@ -343,7 +345,7 @@ router.delete('/deleteInvoice/:rdcID/:invoiceID/:userID', async (req, res) => {
 
 router.post('/calculateDebtInvoicesAmountByInvoiceNumbers', async (req, res) => {
     const [{total}] = await db.select(
-        db.raw('sum(tbl_invoices.totalPrice - tbl_invoices.totalPay) as total')
+        db.raw('sum(tbl_invoices.totalPrice - (tbl_invoices.initialPay + tbl_invoices.totalPay)) as total')
     ).from('tbl_invoices')
      .whereIn('tbl_invoices.invoiceID', req.body.invoiceNumbers);
 
@@ -434,7 +436,8 @@ router.get('/getDebtInvoices/:customerID', async (req, res) => {
     const debtInvoices = await db('tbl_invoices').where('customerID', req.params.customerID).andWhere('wasl', '0').andWhere('stockType', 's').select(['invoiceID']).orderBy('createAt', 'asc');
     const debtInvoicesWithTotal = await db.select(
         'invoiceID as invoiceID',
-        db.raw('(totalPrice - totalPay) as total')
+        'createAt as createAt',
+        db.raw('(totalPrice - (initialPay + totalPay)) as total')
     ).from('tbl_invoices')
      .where('customerID', req.params.customerID)
      .andWhere('wasl', '0')

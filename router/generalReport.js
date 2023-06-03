@@ -12,7 +12,7 @@ router.get('/moneyMovement/:from/:to', async(req,res) => {
            const [[{totalDebtCompany}]] = await db.raw(`SELECT ifnull(SUM(tbl_return_debt.amountReturn - tbl_return_debt.discount),0) AS totalDebtCompany FROM tbl_return_debt where date(tbl_return_debt.createAt) between "${req.params.from}" and "${req.params.to}"`)
           const [[{totalDiscountInvoice}]] = await db.raw(`SELECT IFNULL(SUM(tbl_invoices.discount),0) AS totalDiscountInvoice FROM tbl_invoices where date(tbl_invoices.createAt) between "${req.params.from}" and "${req.params.to}"`)
          const [[{totalDiscountPurchase}]] = await db.raw(`SELECT IFNULL(SUM(tbl_purchases.discount),0) AS totalDiscountPurchase FROM tbl_purchases where date(tbl_purchases.createAt) between "${req.params.from}" and "${req.params.to}"`)
-        const [[{totalExpenseIQD}]] = await db.raw(`SELECT IFNULL(SUM(tbl_expenses.priceExpenseIQD),0) AS totalExpenseIQD FROM tbl_expenses where date(tbl_expenses.createAt) between "${req.params.from}" and "${req.params.to}"`)
+        const [[{totalExpenseDollar}]] = await db.raw(`SELECT IFNULL(SUM(tbl_expenses.priceExpenseIQD / tbl_expenses.dollarPrice),0) + IFNULL(SUM(tbl_expenses.priceExpense$),0) AS totalExpenseDollar FROM tbl_expenses where date(tbl_expenses.createAt) between "${req.params.from}" and "${req.params.to}"`)
        const [[{totalReturnSale}]] = await db.raw(`SELECT ifnull(SUM(tbl_invoices.totalPrice),0) AS totalReturnSale FROM tbl_invoices where date(tbl_invoices.createAt) between "${req.params.from}" and "${req.params.to}" and tbl_invoices.stockType = 'rs'`)
       const [[{totalReturnPurchase}]] = await db.raw(`SELECT ifnull(SUM(tbl_purchases.totalPrice),0) AS totalReturnPurchase FROM tbl_purchases where date(tbl_purchases.createAt) between "${req.params.from}" and "${req.params.to}" and tbl_purchases.stockType = 'rp'`)
      const [[{totalProfit}]] = await db.raw(`SELECT -1 * ifnull(SUM(tbl_stock.qty * (tbl_stock.itemPrice - tbl_stock.costPrice)),0) AS totalProfit FROM tbl_stock WHERE sourceType IN ('s','rs') and date(tbl_stock.createAt) between "${req.params.from}" and "${req.params.to}" `)   
@@ -23,12 +23,13 @@ router.get('/moneyMovement/:from/:to', async(req,res) => {
             totalDebtCompany,
             totalDiscountInvoice,
             totalDiscountPurchase,
-            totalExpenseIQD,
+            totalExpenseDollar,
             totalReturnSale,
             totalReturnPurchase,
             totalProfit
         })
     } catch (error) {
+        console.log(error);
         res.status(500).send(error)
     }
 })
